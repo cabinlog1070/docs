@@ -13,7 +13,7 @@
 
 ## Requirement Completeness
 
-- [ ] No [NEEDS CLARIFICATION] markers remain
+- [x] No [NEEDS CLARIFICATION] markers remain
 - [x] Requirements are testable and unambiguous
 - [x] Success criteria are measurable
 - [x] Success criteria are technology-agnostic (no implementation details)
@@ -31,11 +31,4 @@
 
 ## Notes
 
-- Items marked incomplete require spec updates before `/speckit-clarify` or `/speckit-plan`
-- 남은 [NEEDS CLARIFICATION] 3건 (`/speckit-clarify`에서 결정):
-  1. FR-008 삭제된 댓글 자리: 답글이 없어도 항상 자리·작성자를 남길지, 답글 없는 댓글은 없애고 작성자·시각을 숨길지 (SOC-01, SOC-02)
-  2. FR-010 댓글 삭제 권한을 그 글의 블로그 주인과 관리자에게도 줄지 (SOC-01)
-  3. FR-011 방문자도 이름+비밀번호로 댓글을 쓰고 지우게 할지 (SOC-01)
-- 자체 검토 1회: 화면 경로·함수·테이블 이름은 본문에서 뺐다. 사용자에게 보이는 문구와 식별자 허용 범위(1~2,147,483,647)는 제품 규칙이라 그대로 두었다.
-- 알려진 문제는 FR-013, FR-020, FR-021, FR-028, FR-029, FR-045에 "(알려진 문제)"로 표시했다.
-- 그 밖의 미결 열린 질문은 spec의 "원천 문서의 열린 질문"에 현재 동작을 기본값으로 정리했다.
+- 2026-10-07 clarify에서 3건(FR-008 삭제된 댓글 자리, FR-010 삭제 권한, FR-011 방문자 댓글)을 정해 spec의 Clarifications와 관련 시나리오·FR·Edge Cases·Success Criteria·Assumptions에 반영했다. 모든 항목을 통과해 `/speckit-plan`으로 넘어갈 수 있다.
