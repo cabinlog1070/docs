@@ -1,4 +1,4 @@
--- Blogville 전체 ERD — PostgreSQL DDL
+-- BlogCabin 전체 ERD — PostgreSQL DDL
 -- Crowfoot 문서 "Blogville 전체 ERD"(v5)에서 내보낸 DDL. 테이블·컬럼 설명(COMMENT)은 Crowfoot 문서와 README.md에 있다.
 -- 원천: https://crowfoot.java21.net/workspaces/43/models/661
 

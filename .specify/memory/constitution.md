@@ -16,13 +16,13 @@ Sync Impact Report
 - Source: docs/01-requirements.md v1.8 (1장 개요, 4.0 작성 양식, 5장 비기능 요구사항)
 -->
 
-# Blogville Constitution
+# BlogCabin Constitution
 
 ## Core Principles
 
 ### I. 글쓰기가 먼저, 게임은 돕는 역할
 
-Blogville은 블로그 활동을 게임 보상과 연결해 꾸준히 쓰게 만드는 서비스다.
+BlogCabin은 블로그 활동을 게임 보상과 연결해 꾸준히 쓰게 만드는 서비스다.
 
 - 글쓰기와 꾸미기가 제품의 중심이다. 레벨·코인·광장·동물 농장 같은 게임 요소는 글쓰기를
   돕는 역할에 머물러야 하며(MUST), 글을 쓰고 읽는 흐름을 막아서는 안 된다(MUST NOT).

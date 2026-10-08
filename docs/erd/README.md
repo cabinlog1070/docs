@@ -1,6 +1,8 @@
-# Blogville 전체 ERD
+# BlogCabin 전체 ERD
 
 `specs/001-auth-member` ~ `specs/007-town-plaza`(각 spec의 Clarifications 포함)와 `docs/01-requirements.md` v1.8을 아우르는 데이터 모델이다.
+
+> **참고 (2026-10-08):** 이 폴더는 요구사항 v1.8 시점에 Crowfoot으로 설계한 ERD다. 실제로 구현된 최신 DB 구조는 [`../02-erd.md`](../02-erd.md)(코드 저장소의 Drizzle 마이그레이션 기준)를 본다.
 
 - **원본(편집하는 곳)**: Crowfoot 문서 "Blogville 전체 ERD" — https://crowfoot.java21.net/workspaces/43/models/661
   - 요구사항 30건(공통 3 + 기능 27)이 테이블에 연결되어 있고, 반영 대기·근거 없는 테이블은 0건이다.
