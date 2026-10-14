@@ -14,13 +14,13 @@
 
 ```text
 https://blogcabin.java21.net ─▶ 서버 관리자 nginx(443) ─▶ 우리 nginx(:8440, blogcabin-nginx)
-                                                           ├─ /api/v1/* ─▶ 서버 blogcabin-api-1 (:8443)
+                                                           ├─ /api/v1/*, /api/auth/* ─▶ 서버 blogcabin-api-1 (:8443)
                                                            │             └▶ 서버 blogcabin-api-2 (:8444)   ← 번갈아(라운드로빈)
                                                            └─ 나머지 ────▶ 화면 blogcabin-1 (:8441)
                                                                          └▶ 화면 blogcabin-2 (:8442)       ← 번갈아
 ```
 
-- 2026-10-14부터 저장소를 화면(`frontend/`, Next.js)과 서버(`backend/`, Node + Hono)로 나누는 중이다. 서버가 맡는 주소는 모두 `/api/v1/`로 시작하고, 우리 nginx가 그 주소만 서버로 보낸다. 아직 옮기지 않은 일은 화면(Next.js)이 예전처럼 직접 한다
+- 2026-10-14부터 저장소를 화면(`frontend/`, Next.js)과 서버(`backend/`, Node + Hono)로 나누는 중이다. 서버가 맡는 주소는 모두 `/api/v1/`로 시작하고, 우리 nginx가 그 주소만 서버로 보낸다. 예외로 로그인 `/api/auth/`도 서버가 받는다(카카오·구글에 등록한 소셜 로그인 콜백 주소가 이 주소라서). 서버를 바꾸는 동안에는 `/api/auth/`를 화면이 받고(화면에도 같은 로그인 주소가 있다), 서버 두 개가 새 버전이 되면 서버로 넘긴다. 아직 옮기지 않은 일은 화면(Next.js)이 예전처럼 직접 한다
 
 - 앞의 https nginx는 서버 관리자 것이라 고칠 수 없다. 관리자 nginx가 8440으로 보내 주므로 8440에 **우리 nginx 컨테이너**(`nginx:1.27-alpine`, 서버 네트워크)를 두고, 그 뒤에 앱 두 개를 둔다. 포트는 받은 범위 8440~8449 안에서 8440~8444를 쓴다
 - 화면 두 개, 서버 두 개가 늘 같이 손님을 받는다(이중화). 한쪽이 응답하지 않으면 nginx가 다른 쪽으로 다시 보낸다 (`proxy_next_upstream`)
@@ -53,8 +53,8 @@ https://blogcabin.java21.net ─▶ 서버 관리자 nginx(443) ─▶ 우리 ng
 
 | 폴더 | 하는 일 | 상태 확인 |
 |---|---|---|
-| `frontend/` | 화면. 아직 옮기지 않은 영역은 Server Action으로 DB를 직접 쓴다. DB 마이그레이션·시드도 여기 | `/api/health` |
-| `backend/` | 서버 API `/api/v1/…`. 지금은 상태 확인만 있다 | `/api/v1/health` |
+| `frontend/` | 화면. 아직 옮기지 않은 영역은 Server Action으로 DB를 직접 쓴다. 아이템 시드·관리자 계정도 여기 | `/api/health` |
+| `backend/` | 서버 API `/api/v1/…`, 로그인 `/api/auth/…`. DB 코드·마이그레이션도 여기 | `/api/v1/health` |
 
 | 역할 | 어디서 도나 | 코드 |
 |---|---|---|
@@ -67,7 +67,7 @@ https://blogcabin.java21.net ─▶ 서버 관리자 nginx(443) ─▶ 우리 ng
 | 첨부 파일 | **서버 디스크** 폴더 (`UPLOAD_DIR`, 기본 `storage/uploads`) | `src/server/storage.ts` |
 
 ```text
-브라우저 ──HTTPS──▶ 우리 nginx ─┬─ /api/v1/* ─▶ 서버 (backend, Node 24) ──┐
+브라우저 ──HTTPS──▶ 우리 nginx ─┬─ /api/v1/*, /api/auth/* ─▶ 서버 (backend, Node 24) ──┐
                                 └─ 나머지 ────▶ 화면 (frontend, next start) ─┴─▶ PostgreSQL
                                                      │
                                                      └──▶ 디스크 폴더 UPLOAD_DIR (사진·파일)
@@ -128,7 +128,7 @@ npm run start -- -p 3000
 cd ../backend && npm run build && PORT=4000 npm start   # 서버 (/api/v1/…)
 ```
 
-그다음 배포마다: 맨 위에서 `npm ci`, `frontend/`에서 `npm run build && npm run db:migrate && npm run start`, `backend/`에서 `npm run build && npm start`. 앞에 nginx를 두고 `/api/v1/`만 서버(4000)로 보낸다
+그다음 배포마다: 맨 위에서 `npm ci`, `frontend/`에서 `npm run build && npm run db:migrate && npm run start`, `backend/`에서 `npm run build && npm start`. 앞에 nginx를 두고 `/api/v1/`·`/api/auth/`를 서버(4000)로 보낸다
 (아이템을 바꿨으면 `npm run db:seed`도)
 
 - `npm run db:reset`은 **개발 DB를 비우는 명령이라 운영에서 절대 쓰지 않는다.**
