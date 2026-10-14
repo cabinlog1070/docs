@@ -12,3 +12,5 @@
 | [`.specify/memory/constitution.md`](.specify/memory/constitution.md) | 개발 원칙 |
 
 실행·배포 방법은 코드 저장소의 `README.md`와 `docs/03-deploy.md`에 있다.
+
+요구사항과 ERD는 **이 저장소에서만** 고친다(2026-10-14부터, 코드 저장소에는 사본을 두지 않는다). 기능을 만들며 요구사항이나 DB 설계가 바뀌면 코드 PR과 함께 이 저장소에도 PR을 올린다. 이 저장소는 `main` 브랜치 하나로 운영한다: 브랜치를 만들어 고치고 `main`으로 PR.
