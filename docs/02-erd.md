@@ -1,7 +1,18 @@
 # BlogCabin ERD (데이터베이스 설계)
 
 - DB: PostgreSQL
-- 버전: 0.7 (2026-10-08, 배치 D: 방문자 수 `blog_visits`(BLOG-06), 글 조회 기록 `post_views`(POST-06), 로그인 시도 제한 `login_attempts`(NF-10), 즐겨찾는 이웃 `follows.is_favorite`(TOWN-08), 지붕 색 `blogs.roof_color`(TOWN-07), 친구 초대 `profiles.invite_code`·`invited_by`·`invite_rewarded_at`와 원장 사유 `invite`·`invited`(GAME-09), 회원 탈퇴를 위한 `comments.author_id` NULL 허용(AUTH-06). 마이그레이션 `0009_batch_d`)
+- 버전: 1.9 (2026-10-13, 관리자 선물에 펫 알: `gift_pets`(선물 하나에 담긴 펫 종류), 나올 펫이 정해진 알 `user_animals.egg_species_id`(NULL이면 부화할 때 무작위), 알 받은 곳 `gift`. 예전 상점 캐릭터 9종(`char_human`·`char_cat`·`char_dog`·`char_rabbit`·`char_fox`·`char_panda`·`char_robot`·`char_dragon`·`char_unicorn`)을 `items`에서 지우고, 가졌던 주민에게는 캐릭터마다 그 동물 알(판다→곰, 로봇→공룡, 모험가→강아지)을 보낸 사람 없는 선물로 준다. 쓰던 주민은 기본 주민(긴 머리 헤어를 입었으면 `char_girl`, 아니면 `char_boy`)과 그 기본 헤어로 바꾼다. 마이그레이션 `0027_gift_pets`·`0028_remove_old_characters`. 3.3-7)
+- 1.7 (2026-10-13, 관리자 선물: `gifts`·`gift_items`, 원장 사유 `admin_gift`(ref_id = 선물 ID), 알림 종류 `gift`(ref_id = 선물 ID). 마이그레이션 `0026_admin_gift`. 3.3-7)
+- 1.6 (2026-10-13, 댓글 수정(SOC-01): `comments.edited_at`(고친 적 없으면 NULL, 화면에 "수정됨"). 마이그레이션 `0025_comment_edited`)
+- 1.5 (2026-10-13, 헤어: 꾸미기 부위 `hair`(`0023_hair_slot`), 머리 색 `profiles.hair_color`(9색, 비우면 NULL, `0024_hair_color`))
+- 1.4 (2026-10-13, 글 예약 발행(POST-11): 예약 글은 `posts.created_at`에 올라갈 미래 시각을 적고, 그 시각 전에는 주인에게만 보인다(칸을 따로 두지 않음: 시각이 되면 바꾸는 작업 없이 `created_at <= now()` 조건으로 목록·광장·검색에 나타나고 날짜·순서도 그대로 맞는다). 관리자 글 광장 게시판 게시 시간 `posts.pin_hours`(0~720, 0 = 걸지 않음, 회원 글은 0, 기존 관리자 글은 168). 마이그레이션 `0022_post_schedule_pin`)
+- 1.3 (2026-10-13, 펫 색 6가지 더함: `orange`·`mint`·`sky`·`purple`·`gray`·`green`, 마이그레이션 `0020_more_pet_colors`)
+- 1.2 (2026-10-13, 펫 색 `user_animals.color`(`pet_color`, 기본 `default`). 마이그레이션 `0019_pet_color`. 3.3-4)
+- 1.1 (2026-10-12, 광장 이웃 주민(TOWN-12): 상태 메시지 `profiles.status_message`(1~30자, 비우면 NULL). 마이그레이션 `0018_profile_status_message`)
+- 1.0 (2026-10-11, 소셜 로그인 연동 보상: 원장 사유 `social_link`(ref_id = `kakao:회원번호`, 마이그레이션 `0012_social_link_reward`)와, 탈퇴해도 남는 준 기록 `social_link_rewards`(마이그레이션 `0013_social_link_rewards`). 3.3-6)
+- 0.9 (2026-10-08, 원장 사유 `admin_grant` 추가: 관리자 화면의 코인·경험치 지급, ref_id = 준 관리자. 마이그레이션 `0011_admin_grant`)
+- 0.8 (2026-10-08, PostgreSQL enum 타입 12개를 text + CHECK로 바꿈(마이그레이션 `0010_enums_to_text`). 같은 구조를 Crowfoot 문서 673 "BlogCabin ERD"(https://crowfoot.java21.net/workspaces/43/models/673)로 그려 운영 DB에 배포했다)
+- 0.7 (2026-10-08, 배치 D: 방문자 수 `blog_visits`(BLOG-06), 글 조회 기록 `post_views`(POST-06), 로그인 시도 제한 `login_attempts`(NF-10), 즐겨찾는 이웃 `follows.is_favorite`(TOWN-08), 지붕 색 `blogs.roof_color`(TOWN-07), 친구 초대 `profiles.invite_code`·`invited_by`·`invite_rewarded_at`와 원장 사유 `invite`·`invited`(GAME-09), 회원 탈퇴를 위한 `comments.author_id` NULL 허용(AUTH-06). 마이그레이션 `0009_batch_d`)
 - 0.6 (2026-10-08): 동물 농장 펫(TOWN-09): `user_animals`에 이름·성별·꾸미기·데리고 다니기, `animal_species.max_level`, 농장 가방 `farm_items`, `profiles.displayed_animal_id`, `pet_level_up` 알림. 마이그레이션 `0008_pet_farm`)
 - 0.5 (2026-10-08): 알림함 `notifications`, GAME-06·GAME-08. 집 단계(TOWN-11)는 원장에서 계산하므로 테이블 변경 없음)
 - 0.4 (2026-10-08): 아바타 꾸미기 `avatar_equips`·가구 배치 `room_furniture`, SHOP-05·06
@@ -53,6 +64,14 @@ erDiagram
     user_animals |o--o| profiles : "프로필 전시 카드"
     users ||--o{ farm_items : "농장 가방 (물약)"
 
+    users ||--o{ gifts : "받은 선물"
+    users |o--o{ gifts : "보낸 관리자"
+    gifts ||--o{ gift_items : "담긴 아이템"
+    items ||--o{ gift_items : ""
+    gifts ||--o{ gift_pets : "담긴 펫 알"
+    animal_species ||--o{ gift_pets : ""
+    animal_species |o--o{ user_animals : "나올 펫 (정해진 알)"
+
     users |o--o{ profiles : "나를 초대한 회원 (invited_by)"
     blogs ||--o{ blog_visits : "방문 기록 (하루 1번)"
     posts ||--o{ post_views : "조회 기록 (하루 1번)"
@@ -65,6 +84,7 @@ erDiagram
         text image
         text username UK "사이트 자체 로그인 아이디"
         user_role role "user / admin"
+        text locale "화면 언어 ko / ja (NULL = 안 고름)"
         timestamptz created_at
         timestamptz updated_at
     }
@@ -92,6 +112,8 @@ erDiagram
         text invite_code UK "초대 코드 6자리 (0·O·1·I 없음)"
         text invited_by FK "나를 초대한 회원 (SET NULL)"
         timestamptz invite_rewarded_at "초대 보상을 준 시각 (한 번만)"
+        text status_message "상태 메시지 1~30자 (광장 말풍선, TOWN-12)"
+        text hair_color "머리 색 (무료, NULL = 헤어 그대로의 색)"
         timestamptz created_at
     }
     blogs {
@@ -101,14 +123,18 @@ erDiagram
         text title
         text description
         int background_item_id FK "장착 배경"
-        text roof_color "광장 집 지붕 색 8가지 (NULL = 배경 색)"
+        text roof_color
+        real room_char_x "미니룸 캐릭터 자리 (null = 기본)"
+        real room_char_y
+        real room_pet_x "미니룸에 놓은 펫 자리 (null = 캐릭터 옆)"
+        real room_pet_y "광장 집 지붕 색 8가지 (NULL = 배경 색)"
         timestamptz created_at
     }
     items {
         int id PK
         text code UK
         item_type type "character / background / furniture / avatar"
-        avatar_slot slot "avatar만: top / bottom / hat / shoes"
+        avatar_slot slot "avatar만: hair / top / bottom / hat / shoes"
         text name
         int price "0 이상"
         int required_level "1 이상"
@@ -119,6 +145,7 @@ erDiagram
         text user_id PK, FK
         int item_id PK, FK
         timestamptz acquired_at
+        text color "가구 색 (null = 기본)"
     }
     avatar_equips {
         text user_id PK, FK
@@ -148,7 +175,8 @@ erDiagram
         text content_text "검색·요약용"
         visibility visibility "public / private"
         int view_count "0 이상"
-        timestamptz created_at
+        int pin_hours "0~720, 관리자 글 게시 시간"
+        timestamptz created_at "올라가는 시각 (예약 글은 미래)"
         timestamptz updated_at
     }
     tags {
@@ -167,6 +195,7 @@ erDiagram
         text content "1~1000자"
         timestamptz created_at
         timestamptz deleted_at "삭제 표시"
+        timestamptz edited_at "마지막으로 고친 시각"
     }
     post_likes {
         int post_id PK, FK
@@ -204,6 +233,22 @@ erDiagram
         timestamptz created_at
         timestamptz read_at "NULL = 안 읽음"
     }
+    gifts {
+        int id PK
+        text sender_id FK "보낸 관리자 (탈퇴하면 NULL)"
+        text recipient_id FK "받은 주민"
+        text message "함께 보낸 말 1~200자"
+        int coins "0 이상"
+        timestamptz created_at
+    }
+    gift_items {
+        int gift_id PK,FK
+        int item_id PK,FK
+    }
+    gift_pets {
+        int gift_id PK,FK
+        int species_id PK,FK "태어날 펫"
+    }
     animal_species {
         int id PK
         text code UK
@@ -219,13 +264,15 @@ erDiagram
         int id PK
         text user_id FK
         int species_id FK "알이면 NULL"
+        int egg_species_id FK "나올 펫이 정해진 알 (NULL이면 무작위)"
         animal_status status "egg / growing / grown"
         int growth "성장치 = 펫 경험치"
-        egg_source source "starter / level / shop"
+        egg_source source "starter / level / shop / gift"
         int source_level
         text name "펫 이름 1~10자 (알이면 NULL)"
         animal_gender gender "male / female (알이면 NULL)"
         pet_accessory accessory "none / ribbon / flower / scarf"
+        pet_color color "default / brown / yellow / red / black / white / pink (0019) / orange / mint / sky / purple / gray / green (0020)"
         boolean carried "데리고 다니기 (회원당 1)"
         timestamptz hatched_at "만난 날"
         timestamptz grown_at
@@ -251,6 +298,11 @@ erDiagram
         int post_id PK, FK
         date date PK "한국 날짜"
         text viewer_key PK "u:회원ID / b:브라우저UUID / w:탈퇴"
+        timestamptz created_at
+    }
+    social_link_rewards {
+        text provider_id PK "google | kakao | naver"
+        text account_hash PK "소셜 쪽 사용자 ID의 HMAC-SHA256 해시"
         timestamptz created_at
     }
     login_attempts {
@@ -281,9 +333,11 @@ erDiagram
 | 보상 | `attendances`, `point_ledger` | GAME-02~05 |
 | 첨부 | `attachments` | POST-07, POST-09 |
 | 알림 | `notifications` | GAME-06, GAME-08 (SOC-01~03, TOWN-09에서 만듦) |
+| 관리자 선물 | `gifts`, `gift_items` | 관리자 선물 보내기 (2026-10-13) |
 | 동물 농장 | `animal_species`, `user_animals`, `animal_cares`, `farm_items` (+ `profiles.displayed_animal_id`) | TOWN-09, GAME-05 |
 | 방문·조회 기록 | `blog_visits`, `post_views` | BLOG-06, POST-06 |
 | 로그인 시도 제한 | `login_attempts` (어느 테이블도 가리키지 않음) | NF-10 |
+| 소셜 연동 보상 기록 | `social_link_rewards` (어느 테이블도 가리키지 않음) | AUTH-05 |
 
 인증 테이블 4개는 로그인 라이브러리(Better Auth)가 정한 구조를 따르고, 나머지는 직접 설계했다.
 `verifications`는 로그인 과정의 임시 값을 담는 라이브러리 내부용이라 관계도에서 뺐다.
@@ -303,6 +357,7 @@ erDiagram
 - 소셜 로그인은 같은 `accounts` 테이블에 `provider_id = 'kakao'` 같은 행으로 저장된다.
 - 그래서 "회원 1명 ── 로그인 수단 N개" 구조가 된다. 비밀번호 원문은 어디에도 저장하지 않는다.
 - 관리자는 `users.role = 'admin'`. 가입 요청으로는 바꿀 수 없고 관리자 생성 스크립트로만 정한다.
+- 화면 언어(NF-27)는 `users.locale`(`ko`·`ja`, CHECK 제약)에 둔다. 온보딩 전 회원도 고를 수 있어야 해서 `profiles`가 아니라 `users`에 있다. NULL이면 브라우저 쿠키 `lang` → 한국어 순서로 정한다.
 
 ### 3.2 회원 한 명당 블로그 하나 (1:1)
 
@@ -323,7 +378,7 @@ FOREIGN KEY (owner_id, background_item_id) REFERENCES user_items (user_id, item_
 
 ### 3.3-2 아바타 꾸미기와 가구 배치 (SHOP-06, SHOP-05, 2026-10-08)
 
-- 꾸미기 아이템은 `items.type = 'avatar'`이고 `items.slot`에 부위(`top` 상의, `bottom` 하의, `hat` 모자, `shoes` 신발)를 둔다. CHECK `items_slot_check`: avatar면 부위가 꼭 있고, 다른 종류는 없다.
+- 꾸미기 아이템은 `items.type = 'avatar'`이고 `items.slot`에 부위(`hair` 헤어, `top` 상의, `bottom` 하의, `hat` 모자, `shoes` 신발)를 둔다. CHECK `items_slot_check`: avatar면 부위가 꼭 있고, 다른 종류는 없다.
 - 입은 상태 `avatar_equips (user_id, slot, item_id)`: 기본 키 `(user_id, slot)` → **부위마다 하나**. 외래 키 두 개로 DB가 직접 막는다.
 
 ```sql
@@ -332,7 +387,9 @@ FOREIGN KEY (item_id, slot) REFERENCES items (id, slot)                         
 ```
   두 번째 외래 키를 위해 `items`에 UNIQUE `(id, slot)`를 둔다 (`id`만으로도 유일하지만, 외래 키는 묶음 그대로의 UNIQUE가 필요하다).
 - 가구 배치 `room_furniture (user_id, item_id, x, y)`: 기본 키 `(user_id, item_id)` → 같은 가구는 한 미니룸에 하나(다시 놓으면 위치만 바뀜). `(user_id, item_id) → user_items` 복합 외래 키로 가진 가구만 놓는다. 위치는 미니룸 기준 **비율(0~100%)**, 가구 가운데 좌표라서 화면 크기가 달라도 같은 자리에 보인다 (CHECK `0 ≤ x, y ≤ 100`).
-- "한 미니룸에 5개까지"는 행 수 제한이라 CHECK로 막을 수 없어서, 서버(`placeFurniture`)가 회원 잠금(`lockUser`)을 건 트랜잭션 안에서 센다. 동시에 두 개를 놓아도 6개가 되지 않는다.
+- 가구 색 `user_items.color` (2026-10-13, 마이그레이션 `0017_furniture_color`): 가진 가구마다 방 테마에 맞춰 고르는 색. CHECK로 8가지(`wood`·`pink`·`sky`·`mint`·`lemon`·`lilac`·`white`·`navy`)만 받고, null이면 그린 그대로의 기본 색이다. 배치(`room_furniture`)가 아니라 보유(`user_items`)에 두어서 미니룸에서 뺐다가 다시 놓아도 고른 색이 남는다. 그림에는 색을 붙인 가구 키(`furn.chair@pink`)를 넘긴다.
+- 미니룸 가구 수는 제한하지 않는다 (2026-10-13 "한 미니룸에 5개까지" 규칙을 없앰). 기본 키 `(user_id, item_id)` 때문에 가진 가구 수가 곧 최대다.
+- 미니룸 캐릭터·펫 자리 `blogs.room_char_x/y`, `blogs.room_pet_x/y` (2026-10-13, 마이그레이션 `0021_room_character_pet`): 미니룸 기준 %의 발 자리. 캐릭터는 NULL이면 가운데 아래, 펫은 NULL이면 미니룸에 놓지 않은 것(캐릭터 옆에 붙어 다님)이다. 미니룸은 블로그 하나에 하나라 `blogs`에 둔다. CHECK로 x·y가 함께 있거나 함께 NULL이고 0~100 안에 있게 한다. 놓은 펫이 돌아다니는 위치는 화면에서만 바뀌고 저장하지 않는다.
 - 캐릭터를 그리는 곳(헤더, 광장, 미니룸, 댓글)은 `lookSql()`(`src/server/look.ts`)이 만든 **모습 키**(`char.boy+avatar.hat.straw` 처럼 캐릭터 키에 입은 꾸미기를 `+`로 붙인 값)를 받는다. 그림 쪽(`src/lib/art/characters.ts`)이 이 키를 풀어서 겹쳐 그린다.
 - 상점에서 빠진 캐릭터(모험가·고양이 등)는 `items` 행을 지우지 않는다. 이미 산 회원의 `user_items`·장착이 그대로 남아야 하기 때문이다. 상점은 `type = 'character'`를 보여주지도 팔지도 않는다 (`isForSale`, `src/lib/shop.ts`).
 
@@ -352,7 +409,8 @@ FOREIGN KEY (item_id, slot) REFERENCES items (id, slot)                         
 - **레벨업 알림**: 성장치를 더하는 트랜잭션(`addGrowth`)이 전후 레벨을 비교해 오른 레벨마다 `notifications`에 `pet_level_up`을 넣는다. 부분 유니크 인덱스 `(user_id, ref_id, level) WHERE kind = 'pet_level_up'` + `ON CONFLICT DO NOTHING`으로 같은 동물·같은 레벨은 한 번만. 알림 문구의 펫 이름은 저장하지 않고 읽을 때 `user_animals.name`과 잇는다.
 - **데리고 다니기는 한 마리**: `carried boolean` + 부분 유니크 인덱스 `user_animals_carried_uq (user_id) WHERE carried`. 다른 펫을 고르면 같은 트랜잭션에서 먼저 모두 `false`로 바꾸고 새 펫을 `true`로. 알은 데리고 다닐 수 없다 (CHECK `user_animals_carried_check`).
 - **프로필 전시 카드**: `profiles.displayed_animal_id` + 복합 외래 키 `(user_id, displayed_animal_id) → user_animals (user_id, id)` (3.3과 같은 방식). 남의 동물은 DB가 막는다. 대상 쪽에 `UNIQUE (user_id, id)`가 필요해서 `user_animals_user_id_uq`를 만들었다. "다 키운 동물만"은 Server Action이 확인한다 (다 키운 동물은 다시 어려지지 않는다).
-- **펫 꾸미기**는 무료라 아이템 표(`items`)가 아니라 ENUM `pet_accessory` 한 칸이다.
+- **펫 꾸미기**는 무료라 아이템 표(`items`)가 아니라 ENUM `pet_accessory` 한 칸이다. **펫 색**(2026-10-12)도 같은 이유로 `color` 한 칸(`pet_color`, 기본 `default` = 동물마다 정해진 색, CHECK `user_animals_color_check`, 마이그레이션 0019).
+- **알 둥지 10개 · 풀밭 10마리**(2026-10-12)는 DB 제약이 아니라 Server Action이 `lockUser` 트랜잭션 안에서 `status`별로 세어 막는다 (`countAnimals`).
 - **물약 가방** `farm_items (user_id, kind)` = 가진 개수. 잔액(코인)과 달리 개수는 원장에 넣을 경험치·코인이 아니라서 칸으로 둔다. 살 때 `quantity + 1`(UPSERT)과 원장 `potion_purchase`(코인 −50)를 같은 트랜잭션에, 쓸 때 `quantity > 0`인 행만 `−1`로 바꿔서 0개면 아무 행도 안 바뀐다. CHECK `quantity >= 0`.
 - 물 주기는 물약으로 바뀌었다. `care_action`의 `water` 값은 옛 기록 때문에 남기고 화면과 Server Action에서는 받지 않는다 (ENUM 값을 지우려면 타입을 새로 만들어야 해서 위험하다).
 
@@ -368,6 +426,22 @@ FOREIGN KEY (item_id, slot) REFERENCES items (id, slot)                         
 - **방문자 수·조회수** (BLOG-06, POST-06): `blog_visits (blog_id, date, visitor_key)`, `post_views (post_id, date, viewer_key)`. 기본 키가 "같은 대상·같은 한국 날짜·같은 사람은 한 줄"을 DB에서 보장한다 (출석 `attendances (user_id, date)`와 같은 방식). 사람 키는 온보딩을 마친 회원이면 `u:회원ID`, 방문자면 브라우저 쿠키 UUID `b:…`(IP는 저장하지 않는다). 회원 ID를 외래 키로 두지 않은 이유: 방문자도 같은 칸에 들어가고, 회원이 탈퇴해도 숫자가 줄면 안 된다. 탈퇴할 때는 키만 `w:무작위 32자`로 바꾼다 (CHECK로 세 형식만 허용). 조회수 `posts.view_count`는 그대로 두고, `post_views`에 새 줄이 생긴 요청만 +1 한다 (목록마다 COUNT를 다시 세지 않게).
 - **로그인 시도 제한** (NF-10): `login_attempts (login_key PK, failures, locked_until)`. 없는 아이디도 똑같이 세야 해서 `users`를 가리키지 않는다. 로그인 실패마다 UPSERT로 `failures + 1`, 5가 되면 `locked_until = now() + 5분`. 성공하면 행을 지운다.
 - **회원 탈퇴의 댓글** (AUTH-06): `comments.author_id`를 NULL 허용 + `ON DELETE SET NULL`로 바꿨다(예전 `CASCADE`는 탈퇴한 회원의 원댓글과 거기 달린 **남의 답글**까지 지웠다). 탈퇴 처리(`deleteMember`)가 남의 답글이 남은 원댓글만 `deleted_at`·작성자 NULL·내용 `삭제된 댓글이에요`로 남기고 나머지 내 댓글은 지운다. CHECK `comments_author_check`: 작성자가 없는 댓글은 반드시 삭제된 댓글이다.
+
+### 3.3-6 소셜 로그인 연동 보상 (2026-10-11, 마이그레이션 0012·0013)
+
+- 카카오·네이버·구글을 연동하면 연동마다 🪙 100. 원장 사유 `social_link`, ref_id = `제공자:소셜 쪽 사용자 ID`. 한 회원은 같은 소셜로 한 번만 (`grantSocialLinkReward`가 `lockUser` 안에서 확인).
+- "같은 소셜 계정은 사이트 전체에서 한 번만"은 원장으로는 지킬 수 없다: `point_ledger.user_id`가 `ON DELETE CASCADE`라 탈퇴하면 그 회원의 `social_link` 행도 지워져 같은 소셜 계정을 새 회원에 붙이면 또 받는다. 그래서 준 소셜 계정을 `social_link_rewards (provider_id, account_hash) PK`에 남긴다. 소셜 번호는 그대로 두지 않고 `HMAC-SHA256(BETTER_AUTH_SECRET, "kakao:회원번호")`만 둔다(제품 담당 결정 2026-10-11: 탈퇴한 사람의 소셜 번호를 남기지 않음, 같은 계정 판별은 그대로 됨). `users`를 가리키지 않아 탈퇴해도 남고(`login_attempts`와 같은 이유), 회원을 가리키는 칸 없이 소셜 쪽 ID의 해시만 둔다. 보상 트랜잭션은 이 표에 `INSERT … ON CONFLICT DO NOTHING`이 성공했을 때만 원장에 넣는다.
+- 원장의 부분 유니크 인덱스 `point_ledger_social_link_uq (ref_id) WHERE reason = 'social_link'`는 살아 있는 회원끼리 겹치지 않게 하는 이중 장치로 남겨 둔다.
+
+### 3.3-7 관리자 선물 (2026-10-13, 마이그레이션 0026)
+
+- 관리자가 주민을 골라 코인·아이템을 보내고, 보낼 때마다 함께 보낼 말(1~200자)을 적는다. `gifts` 한 행 = 받는 주민 한 명에게 간 선물 하나. 여러 명에게 보내면 주민마다 한 행씩 생긴다.
+- 코인은 원장에 사유 `admin_gift`, ref_id = 선물 ID로 넣는다. 선물마다 ID가 달라서 같은 주민에게 몇 번이든 보낼 수 있다 (원장에 유니크 제약 없음). `gifts.coins`는 무엇을 보냈는지 보여 주기 위한 기록이고 잔액 계산은 원장만 쓴다.
+- 아이템은 `user_items`에 바로 넣고 `gift_items`(N:M)에 남긴다. 이미 가진 아이템은 빼고, 받을 게 하나도 없으면(코인 0, 아이템 모두 보유) 그 주민에게는 선물을 만들지 않는다. 레벨 제한은 선물에는 걸지 않는다.
+- 받은 주민에게 알림 `gift`(actor_id = 보낸 관리자, ref_id = 선물 ID)를 남긴다. 안 읽은 선물 알림은 다음 화면에서 선물 팝업으로 하나씩 보이고, 팝업을 닫으면 읽음이 된다. 함께 보낸 말은 저장한 그대로 보여 주고 번역하지 않는다.
+- 삭제: 받은 주민이 탈퇴하면 선물도 지운다(`CASCADE`). 보낸 관리자가 지워지면 `sender_id`만 비운다(`SET NULL`).
+- 펫 알 (2026-10-13, 마이그레이션 0027): 고른 펫 종류마다 `gift_pets (gift_id, species_id) PK`에 남기고, 받은 주민에게 `user_animals` 알(`source = 'gift'`, `egg_species_id` = 그 종류)을 넣는다. 부화하면 `egg_species_id`의 펫이 나오고(비중 무작위를 건너뜀), 나머지(이름·성별)는 보통 알과 같다. 펫은 이미 키우고 있어도 보내고, 둥지가 꽉 차 있어도 넣는다. `egg_species_id`는 부화한 뒤에도 남겨 둔다(어떤 알이었는지 기록).
+- 예전 캐릭터 정리 (마이그레이션 0028): 가졌던 캐릭터마다 그 동물 알을, 주민마다 보낸 사람 없는 선물 하나(함께 보낸 말 + `gift_pets`)와 `gift` 알림으로 준다.
 
 ### 3.4 코인과 경험치는 저장하지 않고 원장에서 계산 (정규화)
 
@@ -446,15 +520,16 @@ COMMIT
 |---|---|
 | `user_role` | `user`, `admin` |
 | `item_type` | `character`, `background`, `furniture`, `avatar` (마이그레이션 0006) |
-| `avatar_slot` | `top`, `bottom`, `hat`, `shoes` (그리는 순서는 몸 → 하의 → 상의 → 신발 → 모자, `src/lib/art/avatar.ts`) |
+| `avatar_slot` | `hair`, `top`, `bottom`, `hat`, `shoes` (그리는 순서는 몸 → 헤어 → 하의 → 상의 → 신발 → 모자, `src/lib/art/avatar.ts`). `hair`는 2026-10-13(`0023_hair_slot.sql`): 처음 고른 주민의 머리를 헤어 아이템(짧은 머리·긴 머리, 0코인)으로 떼어 냈다. 자기 머리는 가입할 때 갖고 입은 채로 시작하고(`src/db/starter-hair.ts`), 그 전에 가입한 회원은 `npm run db:seed`가 채운다. 헤어를 벗으면 주민의 기본 머리로 그린다 |
 | `visibility` | `public`, `private` |
-| `notification_kind` | `level_up`, `like`, `comment`, `reply`, `pet_level_up` (마이그레이션 0007) |
-| `ledger_reason` | `signup`, `attendance`, `attendance_streak`, `post`, `comment`, `like_received`, `purchase`, `farm_care`, `farm_grown`, `egg_purchase`, `potion_purchase`(0008), `invite`·`invited`(친구 초대, 0009) |
+| `notification_kind` | `level_up`, `like`, `comment`, `reply`, `pet_level_up` (마이그레이션 0007), `gift`(관리자 선물, 0020) |
+| `ledger_reason` | `signup`, `attendance`, `attendance_streak`, `post`, `comment`, `like_received`, `purchase`, `farm_care`, `farm_grown`, `egg_purchase`, `potion_purchase`(0008), `invite`·`invited`(친구 초대, 0009), `admin_grant`(관리자 지급, 0011), `social_link`(0012), `admin_gift`(관리자 선물, 0020) |
 | `animal_status` | `egg`, `growing`, `grown` |
 | `egg_source` | `starter`, `level`, `shop` |
 | `care_action` | `feed`, `pet`, `water`(옛 물 주기 기록, 새로 쓰지 않음) |
 | `animal_gender` | `male`, `female` (0008) |
 | `pet_accessory` | `none`, `ribbon`, `flower`, `scarf` (0008) |
+| `pet_color` | `default`, `brown`, `yellow`, `red`, `black`, `white`, `pink` (0019), `orange`, `mint`, `sky`, `purple`, `gray`, `green` (0020) |
 | `farm_item_kind` | `potion` (0008) |
 
 정해진 값만 들어가도록 PostgreSQL ENUM 타입을 쓴다. 어제 SQLite 블로그에서 `post_types` 코드 테이블로 했던 일을 DB 타입으로 처리하는 방법이다.
