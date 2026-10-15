@@ -1,7 +1,8 @@
 # BlogCabin ERD (데이터베이스 설계)
 
 - DB: PostgreSQL
-- 버전: 2.0 (2026-10-15, @블로그주소 언급(SOC-06): 알림 종류 `mention`(actor_id = 쓴 회원, post_id = 글, 댓글에서면 ref_id = 댓글 ID). 테이블·칸 추가 없음. 마이그레이션 `0029_mention_notification`)
+- 버전: 2.1 (2026-10-15, 미니룸 가구 좌우 뒤집기(SHOP-05): `room_furniture.flipped`(boolean, 기본 false). 마이그레이션 `0030_furniture_flip`)
+- 2.0 (2026-10-15, @블로그주소 언급(SOC-06): 알림 종류 `mention`(actor_id = 쓴 회원, post_id = 글, 댓글에서면 ref_id = 댓글 ID). 테이블·칸 추가 없음. 마이그레이션 `0029_mention_notification`)
 - 1.9 (2026-10-13, 관리자 선물에 펫 알: `gift_pets`(선물 하나에 담긴 펫 종류), 나올 펫이 정해진 알 `user_animals.egg_species_id`(NULL이면 부화할 때 무작위), 알 받은 곳 `gift`. 예전 상점 캐릭터 9종(`char_human`·`char_cat`·`char_dog`·`char_rabbit`·`char_fox`·`char_panda`·`char_robot`·`char_dragon`·`char_unicorn`)을 `items`에서 지우고, 가졌던 주민에게는 캐릭터마다 그 동물 알(판다→곰, 로봇→공룡, 모험가→강아지)을 보낸 사람 없는 선물로 준다. 쓰던 주민은 기본 주민(긴 머리 헤어를 입었으면 `char_girl`, 아니면 `char_boy`)과 그 기본 헤어로 바꾼다. 마이그레이션 `0027_gift_pets`·`0028_remove_old_characters`. 3.3-7)
 - 1.7 (2026-10-13, 관리자 선물: `gifts`·`gift_items`, 원장 사유 `admin_gift`(ref_id = 선물 ID), 알림 종류 `gift`(ref_id = 선물 ID). 마이그레이션 `0026_admin_gift`. 3.3-7)
 - 1.6 (2026-10-13, 댓글 수정(SOC-01): `comments.edited_at`(고친 적 없으면 NULL, 화면에 "수정됨"). 마이그레이션 `0025_comment_edited`)
@@ -159,6 +160,7 @@ erDiagram
         int item_id PK, FK "(user_id, item_id) → user_items"
         real x "0~100 (%)"
         real y "0~100 (%)"
+        boolean flipped "좌우로 뒤집었는지"
         timestamptz created_at
     }
     categories {
@@ -387,7 +389,7 @@ FOREIGN KEY (user_id, item_id) REFERENCES user_items (user_id, item_id) ON DELET
 FOREIGN KEY (item_id, slot) REFERENCES items (id, slot)                               -- 모자는 모자 자리에만
 ```
   두 번째 외래 키를 위해 `items`에 UNIQUE `(id, slot)`를 둔다 (`id`만으로도 유일하지만, 외래 키는 묶음 그대로의 UNIQUE가 필요하다).
-- 가구 배치 `room_furniture (user_id, item_id, x, y)`: 기본 키 `(user_id, item_id)` → 같은 가구는 한 미니룸에 하나(다시 놓으면 위치만 바뀜). `(user_id, item_id) → user_items` 복합 외래 키로 가진 가구만 놓는다. 위치는 미니룸 기준 **비율(0~100%)**, 가구 가운데 좌표라서 화면 크기가 달라도 같은 자리에 보인다 (CHECK `0 ≤ x, y ≤ 100`).
+- 가구 배치 `room_furniture (user_id, item_id, x, y)`: 기본 키 `(user_id, item_id)` → 같은 가구는 한 미니룸에 하나(다시 놓으면 위치만 바뀜). `(user_id, item_id) → user_items` 복합 외래 키로 가진 가구만 놓는다. 위치는 미니룸 기준 **비율(0~100%)**, 가구 가운데 좌표라서 화면 크기가 달라도 같은 자리에 보인다 (CHECK `0 ≤ x, y ≤ 100`). `flipped`(2026-10-15, 마이그레이션 `0030_furniture_flip`): 좌우로 뒤집어 놓았는지, 기본 false. 색처럼 보유가 아니라 배치에 두어 미니룸에서 빼면 같이 지워진다.
 - 가구 색 `user_items.color` (2026-10-13, 마이그레이션 `0017_furniture_color`): 가진 가구마다 방 테마에 맞춰 고르는 색. CHECK로 8가지(`wood`·`pink`·`sky`·`mint`·`lemon`·`lilac`·`white`·`navy`)만 받고, null이면 그린 그대로의 기본 색이다. 배치(`room_furniture`)가 아니라 보유(`user_items`)에 두어서 미니룸에서 뺐다가 다시 놓아도 고른 색이 남는다. 그림에는 색을 붙인 가구 키(`furn.chair@pink`)를 넘긴다.
 - 미니룸 가구 수는 제한하지 않는다 (2026-10-13 "한 미니룸에 5개까지" 규칙을 없앰). 기본 키 `(user_id, item_id)` 때문에 가진 가구 수가 곧 최대다.
 - 미니룸 캐릭터·펫 자리 `blogs.room_char_x/y`, `blogs.room_pet_x/y` (2026-10-13, 마이그레이션 `0021_room_character_pet`): 미니룸 기준 %의 발 자리. 캐릭터는 NULL이면 가운데 아래, 펫은 NULL이면 미니룸에 놓지 않은 것(캐릭터 옆에 붙어 다님)이다. 미니룸은 블로그 하나에 하나라 `blogs`에 둔다. CHECK로 x·y가 함께 있거나 함께 NULL이고 0~100 안에 있게 한다. 놓은 펫이 돌아다니는 위치는 화면에서만 바뀌고 저장하지 않는다.
