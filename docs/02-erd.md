@@ -1,7 +1,8 @@
 # BlogCabin ERD (데이터베이스 설계)
 
 - DB: PostgreSQL
-- 버전: 1.9 (2026-10-13, 관리자 선물에 펫 알: `gift_pets`(선물 하나에 담긴 펫 종류), 나올 펫이 정해진 알 `user_animals.egg_species_id`(NULL이면 부화할 때 무작위), 알 받은 곳 `gift`. 예전 상점 캐릭터 9종(`char_human`·`char_cat`·`char_dog`·`char_rabbit`·`char_fox`·`char_panda`·`char_robot`·`char_dragon`·`char_unicorn`)을 `items`에서 지우고, 가졌던 주민에게는 캐릭터마다 그 동물 알(판다→곰, 로봇→공룡, 모험가→강아지)을 보낸 사람 없는 선물로 준다. 쓰던 주민은 기본 주민(긴 머리 헤어를 입었으면 `char_girl`, 아니면 `char_boy`)과 그 기본 헤어로 바꾼다. 마이그레이션 `0027_gift_pets`·`0028_remove_old_characters`. 3.3-7)
+- 버전: 2.0 (2026-10-15, @블로그주소 언급(SOC-06): 알림 종류 `mention`(actor_id = 쓴 회원, post_id = 글, 댓글에서면 ref_id = 댓글 ID). 테이블·칸 추가 없음. 마이그레이션 `0029_mention_notification`)
+- 1.9 (2026-10-13, 관리자 선물에 펫 알: `gift_pets`(선물 하나에 담긴 펫 종류), 나올 펫이 정해진 알 `user_animals.egg_species_id`(NULL이면 부화할 때 무작위), 알 받은 곳 `gift`. 예전 상점 캐릭터 9종(`char_human`·`char_cat`·`char_dog`·`char_rabbit`·`char_fox`·`char_panda`·`char_robot`·`char_dragon`·`char_unicorn`)을 `items`에서 지우고, 가졌던 주민에게는 캐릭터마다 그 동물 알(판다→곰, 로봇→공룡, 모험가→강아지)을 보낸 사람 없는 선물로 준다. 쓰던 주민은 기본 주민(긴 머리 헤어를 입었으면 `char_girl`, 아니면 `char_boy`)과 그 기본 헤어로 바꾼다. 마이그레이션 `0027_gift_pets`·`0028_remove_old_characters`. 3.3-7)
 - 1.7 (2026-10-13, 관리자 선물: `gifts`·`gift_items`, 원장 사유 `admin_gift`(ref_id = 선물 ID), 알림 종류 `gift`(ref_id = 선물 ID). 마이그레이션 `0026_admin_gift`. 3.3-7)
 - 1.6 (2026-10-13, 댓글 수정(SOC-01): `comments.edited_at`(고친 적 없으면 NULL, 화면에 "수정됨"). 마이그레이션 `0025_comment_edited`)
 - 1.5 (2026-10-13, 헤어: 꾸미기 부위 `hair`(`0023_hair_slot`), 머리 색 `profiles.hair_color`(9색, 비우면 NULL, `0024_hair_color`))
@@ -229,7 +230,7 @@ erDiagram
         text actor_id FK "행동한 회원 (레벨업은 NULL)"
         int post_id FK "관련 글"
         int level "level_up, pet_level_up만"
-        text ref_id "댓글 ID 등"
+        text ref_id "댓글 ID 등 (mention: 댓글이면 댓글 ID)"
         timestamptz created_at
         timestamptz read_at "NULL = 안 읽음"
     }
@@ -395,7 +396,7 @@ FOREIGN KEY (item_id, slot) REFERENCES items (id, slot)                         
 
 ### 3.3-3 알림함 (GAME-08, GAME-06, 2026-10-08)
 
-- `notifications` 한 행 = 받는 회원(`user_id`)에게 생긴 일 하나. 종류(`kind`)는 ENUM `notification_kind`: `level_up`, `like`, `comment`, `reply`, `pet_level_up`(내 펫 레벨업, `ref_id` = 동물 ID, `level` = 오른 레벨, TOWN-09). 종류를 늘려도 기존 기록은 그대로다.
+- `notifications` 한 행 = 받는 회원(`user_id`)에게 생긴 일 하나. 종류(`kind`)는 ENUM `notification_kind`: `level_up`, `like`, `comment`, `reply`, `pet_level_up`(내 펫 레벨업, `ref_id` = 동물 ID, `level` = 오른 레벨, TOWN-09), `gift`(관리자 선물), `mention`(글·댓글의 @블로그주소 언급, SOC-06: 글이면 `ref_id` 없음, 댓글이면 `ref_id` = 댓글 ID). 종류를 늘려도 기존 기록은 그대로다.
 - 종류마다 쓰는 칸이 다르다: 레벨업은 `level`만, 공감·댓글·답글은 `actor_id`(행동한 회원)·`post_id`·`ref_id`(댓글 ID). CHECK `notifications_level_check`: 레벨업 종류일 때만 `level`이 있다. CHECK `notifications_actor_check`: `actor_id <> user_id` → 자기 행동은 알림이 될 수 없다.
 - 읽음은 `read_at`(NULL = 안 읽음). 레벨업 팝업을 "봤음"도 같은 칸으로 처리해서 "마지막으로 본 레벨" 같은 컬럼을 따로 두지 않는다.
 - 같은 레벨의 레벨업 알림은 한 번만: 부분 유니크 인덱스 `(user_id, level) WHERE kind = 'level_up'` + 보상 트랜잭션의 회원 잠금(`lockUser`). 레벨은 원장 합계로 계산하므로(3.4) 알림을 만드는 쪽(`recordLevelUps`)이 원장 INSERT 뒤 합계를 다시 읽어 전후 레벨을 비교한다.
@@ -522,7 +523,7 @@ COMMIT
 | `item_type` | `character`, `background`, `furniture`, `avatar` (마이그레이션 0006) |
 | `avatar_slot` | `hair`, `top`, `bottom`, `hat`, `shoes` (그리는 순서는 몸 → 헤어 → 하의 → 상의 → 신발 → 모자, `src/lib/art/avatar.ts`). `hair`는 2026-10-13(`0023_hair_slot.sql`): 처음 고른 주민의 머리를 헤어 아이템(짧은 머리·긴 머리, 0코인)으로 떼어 냈다. 자기 머리는 가입할 때 갖고 입은 채로 시작하고(`src/db/starter-hair.ts`), 그 전에 가입한 회원은 `npm run db:seed`가 채운다. 헤어를 벗으면 주민의 기본 머리로 그린다 |
 | `visibility` | `public`, `private` |
-| `notification_kind` | `level_up`, `like`, `comment`, `reply`, `pet_level_up` (마이그레이션 0007), `gift`(관리자 선물, 0020) |
+| `notification_kind` | `level_up`, `like`, `comment`, `reply`, `pet_level_up` (마이그레이션 0007), `gift`(관리자 선물, 0020), `mention`(@언급, 0029) |
 | `ledger_reason` | `signup`, `attendance`, `attendance_streak`, `post`, `comment`, `like_received`, `purchase`, `farm_care`, `farm_grown`, `egg_purchase`, `potion_purchase`(0008), `invite`·`invited`(친구 초대, 0009), `admin_grant`(관리자 지급, 0011), `social_link`(0012), `admin_gift`(관리자 선물, 0020) |
 | `animal_status` | `egg`, `growing`, `grown` |
 | `egg_source` | `starter`, `level`, `shop` |
