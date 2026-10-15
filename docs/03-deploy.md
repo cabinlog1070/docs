@@ -8,30 +8,27 @@
 1. 서버에 SSH로 접속해 CPU 종류(amd64/arm64)와 Docker 사용 가능 여부를 확인한다
 2. 그 CPU에 맞는 Docker 이미지 두 개를 빌드해 파일 하나로 묶는다: 화면 `blogcabin-web`(`frontend/Dockerfile`), 서버 `blogcabin-api`(`backend/Dockerfile`)
 3. 이미지 파일·`deploy.env`(DB 주소 등)·`deploy/deploy.sh`를 서버의 `~/blogcabin/releases/`로 보낸다
-4. 서버에서 `deploy/deploy.sh`가 이미지를 불러오고 → DB 마이그레이션(서버 이미지) → `db:seed` → (첫 배포만) `admin:create` (이 둘은 화면 이미지) → **롤링 배포**로 서버 두 개, 그다음 화면 두 개를 하나씩 새 이미지로 바꾼다 (아래). 실패하면 그 컨테이너를 직전 이미지로 되돌린다
+4. 서버에서 `deploy/deploy.sh`가 이미지를 불러오고 → DB 마이그레이션(서버 이미지) → `db:seed` → (첫 배포만) `admin:create` (이 둘은 화면 이미지) → 새 이미지를 시험용 포트(8449)에서 먼저 켜 보고 → **롤링 배포**로 앱 두 개를 하나씩 새 이미지로 바꾼다 (아래). 실패하면 직전 이미지로 되돌린다
 
-### 무중단 롤링 배포 (2026-10-14)
+### 무중단 롤링 배포: 포트 두 개 (2026-10-15)
 
 ```text
-https://blogcabin.java21.net ─▶ 서버 관리자 nginx(443) ─▶ 우리 nginx(:8440, blogcabin-nginx)
-                                                           ├─ /api/v1/*, /api/auth/* ─▶ 서버 blogcabin-api-1 (:8443)
-                                                           │             └▶ 서버 blogcabin-api-2 (:8444)   ← 번갈아(라운드로빈)
-                                                           └─ 나머지 ────▶ 화면 blogcabin-1 (:8441)
-                                                                         └▶ 화면 blogcabin-2 (:8442)       ← 번갈아
+https://blogcabin.java21.net ─▶ 서버 관리자 nginx(443) ─▶ upstream blogcabin_java21_app (~/nginx/blogcabin.java21.net.conf)
+                                                           ├─▶ 앱 blogcabin-1 (:8440)
+                                                           └─▶ 앱 blogcabin-2 (:8441)   ← 번갈아(라운드로빈)
 ```
 
-- 2026-10-14부터 저장소를 화면(`frontend/`, Next.js)과 서버(`backend/`, Node + Hono)로 나누는 중이다. 서버가 맡는 주소는 모두 `/api/v1/`로 시작하고, 우리 nginx가 그 주소만 서버로 보낸다. 예외로 로그인 `/api/auth/`도 서버가 받는다(카카오·구글에 등록한 소셜 로그인 콜백 주소가 이 주소라서). 서버를 바꾸는 동안에는 `/api/auth/`를 화면이 받고(화면에도 같은 로그인 주소가 있다), 서버 두 개가 새 버전이 되면 서버로 넘긴다. 아직 옮기지 않은 일은 화면(Next.js)이 예전처럼 직접 한다
-
-- 앞의 https nginx는 서버 관리자 것이라 고칠 수 없다. 관리자 nginx가 8440으로 보내 주므로 8440에 **우리 nginx 컨테이너**(`nginx:1.27-alpine`, 서버 네트워크)를 두고, 그 뒤에 앱 두 개를 둔다. 포트는 받은 범위 8440~8449 안에서 8440~8444를 쓴다
-- 화면 두 개, 서버 두 개가 늘 같이 손님을 받는다(이중화). 한쪽이 응답하지 않으면 nginx가 다른 쪽으로 다시 보낸다 (`proxy_next_upstream`)
-- 배포 순서: **서버 먼저, 그다음 화면** (새 화면이 부를 API가 먼저 있어야 한다). 각각 ① 1번을 nginx에서 빼고(`down`) 새 버전으로 바꿔 상태 확인(화면 `/api/health`, 서버 `/api/v1/health`) → ② 손님을 1번(새 버전)으로 넘기고 2번을 빼서 바꾼다 → ③ 둘 다 다시 받는다. 옛 버전과 새 버전이 동시에 손님을 받지 않아서 화면 파일이 섞이지 않는다
-- ①에서 새 버전이 안 뜨면 1번을 직전 이미지로 되돌리고 끝낸다(사이트는 옛 버전 그대로). ②에서 2번이 안 뜨면 1번(새 버전) 하나로 계속 돈다. 서버는 새 버전으로 바뀌었는데 화면이 실패하면 새 서버 + 옛 화면으로 돈다
-- **API 바꾸기 주의**: DB처럼 배포하는 동안 옛 화면이 새 서버를 잠깐 부른다. 주소를 지우거나 이름을 바꿀 때는 "새 주소 추가 → 다음 배포에서 옛 주소 정리"처럼 두 번에 나눈다
-- 폴더를 나눈 뒤 첫 배포는 서버 두 개를 손님 없이 켜서 상태를 확인한 다음 nginx에 붙이고, 화면은 예전처럼 하나씩 바꾼다 (끊기지 않는다)
-- 컨테이너 네 개 모두 같은 DB, 같은 `~/blogcabin/uploads`를 쓴다. 로그인은 DB에 저장돼서 어느 앱으로 가도 그대로다
-- **DB 구조 변경 주의**: 마이그레이션은 컨테이너를 바꾸기 전에 한 번 돌고, 바꾸는 동안 옛 버전도 잠깐 그 DB를 쓴다. 칼럼 지우기·이름 바꾸기는 한 번에 하지 말고 "새 칼럼 추가 → 다음 배포에서 옛 칼럼 정리"처럼 두 번에 나눈다
-- 처음 이 방식으로 배포할 때만 예전 앱(`blogcabin`, 8440)을 끄고 nginx를 켜는 사이 1초 안팎 끊길 수 있다. 그 뒤로는 끊기지 않는다
-- nginx 설정은 배포마다 `~/blogcabin/nginx/`에 다시 만든다 (`nginx.conf`, 컨테이너 상태 `upstream.conf`). 직접 고치지 않는다
+- 앱 하나가 화면과 서버를 같이 받는다. 화면(Next.js)이 `/api/v1/…` 요청을 서버 앱(`backend/`의 Hono)에 그대로 넘겨 안에서 돌린다(`frontend/src/app/api/v1/[...path]/route.ts`). 로그인 `/api/auth/…`는 화면의 같은 로그인 설정이 받는다. 서버 코드는 `backend/`에 그대로 있고, 서버 이미지(`blogcabin-api`)는 배포 때 DB 마이그레이션에만 쓴다
+- 앞의 https nginx는 여러 학생이 같이 쓰는 서버 관리자 것이다. 그 nginx가 각 계정의 `~/nginx/*.conf`를 읽어서, 우리 파일 `~/nginx/blogcabin.java21.net.conf`에 upstream(8440·8441, `max_fails=1 fail_timeout=5s`)과 `proxy_next_upstream error timeout http_502 http_503`을 넣었다. 한쪽이 멈추면 nginx가 다른 쪽으로 다시 보낸다(이중화)
+- 이 파일은 `deploy.sh`가 upstream이 없을 때 **한 번만** 고친다: Certbot 줄은 그대로 두고, nginx 문법 검사를 통과할 때만 바꾸고, 원래 파일은 `~/blogcabin/nginx-backup/`에 남긴다. 첨부(30MB)가 들어오게 `client_max_body_size`를 40M로 올린다. 틀린 줄이 들어가면 모든 학생의 nginx가 다시 읽기를 못 하니 손으로 고칠 때도 조심한다. upstream 이름은 다른 학생과 겹치지 않게 길게 지었다
+- 고친 파일은 **선생님(관리자)이 nginx를 다시 읽어야(reload)** 적용된다. 그 전까지 서버 nginx는 8440 하나만 알아서, 배포 때 8440을 바꾸는 몇 초 동안 끊긴다
+- 배포 순서: ① 새 이미지를 시험용 포트 8449에서 켜서 상태 확인(화면 `/api/health`와 서버 `/api/v1/health` 둘 다)을 통과하는지 본다. 서버 nginx에는 우리가 `down`을 붙일 수 없어서 새 앱이 상태 확인 전에도 손님을 받기 때문에, 망가진 이미지는 여기서 거른다(통과 못 하면 사이트는 하나도 안 바뀐다) → ② 2번(8441)을 멈추고 새 이미지로 바꿔 상태 확인 → 8초 기다린다 → ③ 1번(8440)을 멈추고 바꾼다
+- 8초를 기다리는 까닭: 서버 nginx는 멈췄던 2번을 5초(`fail_timeout`) 동안 "죽음"으로 기억한다. 그 사이 1번까지 멈추면 갈 곳이 없어 502가 난다(시험으로 확인). 이 몇 초 동안은 옛 버전과 새 버전이 같이 손님을 받는다
+- ②에서 새 버전이 안 뜨면 2번을 직전 이미지로 되돌린다. ③에서 안 뜨면 두 앱을 모두 직전 이미지로 되돌린다(두 버전이 섞인 채 남지 않게)
+- 앱을 멈출 때는 처리 중인 요청을 마칠 시간을 준다(`docker stop -t 30`). 서버 nginx는 접속이 안 되는 쪽을 실패로 보고 다른 쪽으로 다시 보낸다
+- **API·DB 바꾸기 주의**: 배포하는 동안 옛 버전과 새 버전이 잠깐 같은 DB를 쓴다. 칼럼이나 API 주소를 지우거나 이름을 바꿀 때는 "새 것 추가 → 다음 배포에서 옛 것 정리"처럼 두 번에 나눈다
+- 두 앱은 같은 DB, 같은 `~/blogcabin/uploads`를 쓴다. 로그인은 DB에 저장돼서 어느 앱으로 가도 그대로다
+- 예전 구성(우리 nginx 컨테이너 8440 → 화면 8441·8442, 서버 8443·8444, 2026-10-14)에서 처음 바꿀 때는 예전 nginx가 8441로 보내지 않게 한 뒤 새 앱을 8441에 켜고, 8440을 예전 nginx에서 새 앱으로 넘긴다. 그 순간만 1초 안팎 끊긴다. 8440 새 앱이 안 뜨면 예전 nginx를 다시 켠다. 중간에 끊긴 배포를 다시 돌려도 이어서 한다
 
 | 저장소 시크릿 | 쓰임 |
 |---|---|
@@ -42,10 +39,11 @@ https://blogcabin.java21.net ─▶ 서버 관리자 nginx(443) ─▶ 우리 ng
 
 서버 쪽 준비와 폴더:
 - Docker가 설치돼 있고, SSH 계정이 `docker`를 쓸 수 있어야 한다 (docker 그룹 또는 비밀번호 없는 sudo)
-- `DB_ADDRESS`가 `localhost`이거나 기본 네트워크로 DB에 닿지 않으면 앱이 서버 네트워크를 그대로 쓴다(`--network host`). 앱은 늘 0.0.0.0에서 듣는다: 127.0.0.1로 듣게 하면 블로그 주소(`/@아이디`)가 500이 된다(2026-10-14 핫픽스). 아니면 `-p 127.0.0.1:8441:8441`처럼 서버 안에서만 열린다
+- `DB_ADDRESS`가 `localhost`이거나 기본 네트워크로 DB에 닿지 않으면 앱이 서버 네트워크를 그대로 쓴다(`--network host`). 앱은 늘 0.0.0.0에서 듣는다: 127.0.0.1로 듣게 하면 블로그 주소(`/@아이디`)가 500이 된다(2026-10-14 핫픽스). 아니면 `-p 127.0.0.1:8440:8440`처럼 서버 안에서만 열린다
 - `~/blogcabin/secrets.env`: 첫 배포 때 서버가 만든 로그인 비밀키(`BETTER_AUTH_SECRET`)와 관리자 비밀번호(`ADMIN_PASSWORD`). 지우면 모든 회원이 로그아웃되니 지우지 않는다. 관리자 비밀번호 보기: `grep ADMIN_PASSWORD ~/blogcabin/secrets.env`
 - `~/blogcabin/uploads/`: 글 첨부 사진·파일 (컨테이너의 `/data/uploads`). 백업 대상
-- 로그 보기: 화면 `docker logs --tail 100 blogcabin-1` (`blogcabin-2`), 서버 `blogcabin-api-1`·`blogcabin-api-2`, nginx는 `blogcabin-nginx`
+- `~/blogcabin/nginx-backup/`: `deploy.sh`가 서버 nginx 설정을 고치기 전의 원래 파일
+- 로그 보기: `docker logs --tail 100 blogcabin-1` (`blogcabin-2`). 서버 nginx 로그는 관리자 것이라 볼 수 없다
 
 ## 1. 구조: 화면(frontend)과 서버(backend)
 
@@ -53,8 +51,8 @@ https://blogcabin.java21.net ─▶ 서버 관리자 nginx(443) ─▶ 우리 ng
 
 | 폴더 | 하는 일 | 상태 확인 |
 |---|---|---|
-| `frontend/` | 화면. 아직 옮기지 않은 영역은 Server Action으로 DB를 직접 쓴다. 아이템 시드·관리자 계정도 여기 | `/api/health` |
-| `backend/` | 서버 API `/api/v1/…`, 로그인 `/api/auth/…`. DB 코드·마이그레이션도 여기 | `/api/v1/health` |
+| `frontend/` | 화면. 아직 옮기지 않은 영역은 Server Action으로 DB를 직접 쓴다. 아이템 시드·관리자 계정도 여기. 운영에서는 `/api/v1/…`도 서버 앱을 안에서 돌려 받는다 | `/api/health` |
+| `backend/` | 서버 API `/api/v1/…`, 로그인 `/api/auth/…`. DB 코드·마이그레이션도 여기. 개발 때는 따로 띄우고(4000), 운영에서는 화면 안에서 돈다 | `/api/v1/health` |
 
 | 역할 | 어디서 도나 | 코드 |
 |---|---|---|
@@ -67,10 +65,10 @@ https://blogcabin.java21.net ─▶ 서버 관리자 nginx(443) ─▶ 우리 ng
 | 첨부 파일 | **서버 디스크** 폴더 (`UPLOAD_DIR`, 기본 `storage/uploads`) | `src/server/storage.ts` |
 
 ```text
-브라우저 ──HTTPS──▶ 우리 nginx ─┬─ /api/v1/*, /api/auth/* ─▶ 서버 (backend, Node 24) ──┐
-                                └─ 나머지 ────▶ 화면 (frontend, next start) ─┴─▶ PostgreSQL
-                                                     │
-                                                     └──▶ 디스크 폴더 UPLOAD_DIR (사진·파일)
+브라우저 ──HTTPS──▶ 서버 nginx ─┬─▶ 앱 1 (:8440) ─┐  앱 = 화면(frontend, next start)
+                                └─▶ 앱 2 (:8441) ─┤        + 그 안의 서버(backend) /api/v1/*
+                                                  ├─▶ PostgreSQL
+                                                  └─▶ 디스크 폴더 UPLOAD_DIR (사진·파일)
 ```
 
 ## 2. 운영에 필요한 것
