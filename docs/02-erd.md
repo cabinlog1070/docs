@@ -1,7 +1,8 @@
 # BlogCabin ERD (데이터베이스 설계)
 
 - DB: PostgreSQL
-- 버전: 2.5 (2026-10-16, 상의 넣어 입기/빼 입기: `profiles.top_out`(boolean, 기본 false = 넣어 입기, true면 모습 키의 상의 키 뒤에 `@out`). 마이그레이션 `0034_top_out`)
+- 버전: 2.6 (2026-10-16, 문의함(AUTH-11): `inquiries`(문의 하나, 회원이 보내면 `user_id`, 로그인 없이 보내면 `user_id` 없이 `contact_email`·`guest_username`), 알림 종류 `inquiry_answer`(ref_id = 문의 ID). 마이그레이션 `0035_inquiries`. 3.3-8)
+- 2.5 (2026-10-16, 상의 넣어 입기/빼 입기: `profiles.top_out`(boolean, 기본 false = 넣어 입기, true면 모습 키의 상의 키 뒤에 `@out`). 마이그레이션 `0034_top_out`)
 - 2.4 (2026-10-16, 답글에 단 답글(SOC-02): `comments.reply_to_id`(같은 표 `id` 참조, 받는 답글 행이 지워지면 `SET NULL`, 화면이 그 답글 바로 아래에 `↪ 받는 사람`과 함께 놓는다). 마이그레이션 `0033_comment_reply_to`)
 - 2.3 (2026-10-16, 댓글 하트(SOC-07): `comment_likes`(댓글 ↔ 하트 누른 회원, 기본 키 `(comment_id, user_id)`, 댓글·회원이 지워지면 함께 삭제). 마이그레이션 `0032_comment_likes`)
 - 2.2 (2026-10-16, 해시태그를 적은 순서대로 보이기(POST-04): `post_tags.position`(smallint, 기본 0, 글쓴이가 적은 순서). 칸이 생기기 전 글은 모두 0이라 이름순. 마이그레이션 `0031_post_tag_position`)
@@ -79,6 +80,8 @@ erDiagram
     gifts ||--o{ gift_items : "담긴 아이템"
     items ||--o{ gift_items : ""
     gifts ||--o{ gift_pets : "담긴 펫 알"
+    users |o--o{ inquiries : "보낸 문의 (로그인 없이 보내면 없음)"
+    users |o--o{ inquiries : "답한 관리자"
     animal_species ||--o{ gift_pets : ""
     animal_species |o--o{ user_animals : "나올 펫 (정해진 알)"
 
@@ -252,6 +255,19 @@ erDiagram
         timestamptz created_at
         timestamptz read_at "NULL = 안 읽음"
     }
+    inquiries {
+        int id PK
+        text user_id FK "보낸 회원 (로그인 없이 보내면 NULL)"
+        text guest_username "로그인 없이: 적어 준 아이디"
+        text contact_email "로그인 없이: 답받을 이메일 (필수)"
+        text topic "password | account | bug | other"
+        text content "1~2000자"
+        text answer "관리자 답 (최대 2000자)"
+        text answered_by FK "답한 관리자"
+        timestamptz answered_at
+        text status "waiting | answered | closed"
+        timestamptz created_at
+    }
     gifts {
         int id PK
         text sender_id FK "보낸 관리자 (탈퇴하면 NULL)"
@@ -353,6 +369,7 @@ erDiagram
 | 첨부 | `attachments` | POST-07, POST-09 |
 | 알림 | `notifications` | GAME-06, GAME-08 (SOC-01~03, TOWN-09에서 만듦) |
 | 관리자 선물 | `gifts`, `gift_items` | 관리자 선물 보내기 (2026-10-13) |
+| 문의함 | `inquiries` | AUTH-11 (2026-10-16) |
 | 동물 농장 | `animal_species`, `user_animals`, `animal_cares`, `farm_items` (+ `profiles.displayed_animal_id`) | TOWN-09, GAME-05 |
 | 방문·조회 기록 | `blog_visits`, `post_views` | BLOG-06, POST-06 |
 | 로그인 시도 제한 | `login_attempts` (어느 테이블도 가리키지 않음) | NF-10 |
@@ -414,7 +431,7 @@ FOREIGN KEY (item_id, slot) REFERENCES items (id, slot)                         
 
 ### 3.3-3 알림함 (GAME-08, GAME-06, 2026-10-08)
 
-- `notifications` 한 행 = 받는 회원(`user_id`)에게 생긴 일 하나. 종류(`kind`)는 ENUM `notification_kind`: `level_up`, `like`, `comment`, `reply`, `pet_level_up`(내 펫 레벨업, `ref_id` = 동물 ID, `level` = 오른 레벨, TOWN-09), `gift`(관리자 선물), `mention`(글·댓글의 @블로그주소 언급, SOC-06: 글이면 `ref_id` 없음, 댓글이면 `ref_id` = 댓글 ID). 종류를 늘려도 기존 기록은 그대로다.
+- `notifications` 한 행 = 받는 회원(`user_id`)에게 생긴 일 하나. 종류(`kind`)는 ENUM `notification_kind`: `level_up`, `like`, `comment`, `reply`, `pet_level_up`(내 펫 레벨업, `ref_id` = 동물 ID, `level` = 오른 레벨, TOWN-09), `gift`(관리자 선물), `mention`(글·댓글의 @블로그주소 언급, SOC-06: 글이면 `ref_id` 없음, 댓글이면 `ref_id` = 댓글 ID), `inquiry_answer`(관리자가 내 문의에 답함, AUTH-11: `actor_id` = 답한 관리자, `ref_id` = 문의 ID). 종류를 늘려도 기존 기록은 그대로다.
 - 종류마다 쓰는 칸이 다르다: 레벨업은 `level`만, 공감·댓글·답글은 `actor_id`(행동한 회원)·`post_id`·`ref_id`(댓글 ID). CHECK `notifications_level_check`: 레벨업 종류일 때만 `level`이 있다. CHECK `notifications_actor_check`: `actor_id <> user_id` → 자기 행동은 알림이 될 수 없다.
 - 읽음은 `read_at`(NULL = 안 읽음). 레벨업 팝업을 "봤음"도 같은 칸으로 처리해서 "마지막으로 본 레벨" 같은 컬럼을 따로 두지 않는다.
 - 같은 레벨의 레벨업 알림은 한 번만: 부분 유니크 인덱스 `(user_id, level) WHERE kind = 'level_up'` + 보상 트랜잭션의 회원 잠금(`lockUser`). 레벨은 원장 합계로 계산하므로(3.4) 알림을 만드는 쪽(`recordLevelUps`)이 원장 INSERT 뒤 합계를 다시 읽어 전후 레벨을 비교한다.
@@ -461,6 +478,15 @@ FOREIGN KEY (item_id, slot) REFERENCES items (id, slot)                         
 - 삭제: 받은 주민이 탈퇴하면 선물도 지운다(`CASCADE`). 보낸 관리자가 지워지면 `sender_id`만 비운다(`SET NULL`).
 - 펫 알 (2026-10-13, 마이그레이션 0027): 고른 펫 종류마다 `gift_pets (gift_id, species_id) PK`에 남기고, 받은 주민에게 `user_animals` 알(`source = 'gift'`, `egg_species_id` = 그 종류)을 넣는다. 부화하면 `egg_species_id`의 펫이 나오고(비중 무작위를 건너뜀), 나머지(이름·성별)는 보통 알과 같다. 펫은 이미 키우고 있어도 보내고, 둥지가 꽉 차 있어도 넣는다. `egg_species_id`는 부화한 뒤에도 남겨 둔다(어떤 알이었는지 기록).
 - 예전 캐릭터 정리 (마이그레이션 0028): 가졌던 캐릭터마다 그 동물 알을, 주민마다 보낸 사람 없는 선물 하나(함께 보낸 말 + `gift_pets`)와 `gift` 알림으로 준다.
+
+### 3.3-8 문의함 (AUTH-11, 2026-10-16, 마이그레이션 0035)
+
+- 문의하기 화면에서 남긴 문의 하나 = `inquiries` 한 행. 관리자는 관리자 화면 [문의함]에서 상태별로 본다. 관리자 메일 주소는 화면에 두지 않는다(제품 담당 결정).
+- 보낸 사람: 로그인한 회원이면 `user_id`, 로그인하지 못하는 사람(비밀번호를 잊은 사람)이면 `user_id` 없이 답받을 `contact_email`(필수, 소문자로 저장)과 아는 아이디 `guest_username`(선택). CHECK `inquiries_sender_check`: `user_id IS NOT NULL OR contact_email IS NOT NULL`. 아이디는 본인 확인 전이라 `users`를 가리키지 않고 적은 글자 그대로 두고, 관리자 화면이 읽을 때 같은 아이디의 회원을 찾아 잇는다.
+- 종류 `topic`(`password`·`account`·`bug`·`other`)와 상태 `status`(`waiting` 답 기다리는 중 → `answered` 답변함, 언제든 `closed` 처리 완료, 다시 열면 답이 있으면 `answered`, 없으면 `waiting`)는 text + CHECK(3.9와 같은 방식). 내용·답은 2000자까지(CHECK).
+- 답(`answer`·`answered_by`·`answered_at`)은 문의 행에 같이 둔다. 문의 하나에 답 하나(고쳐 쓰면 덮어씀)라 표를 나누지 않았다. 회원 문의에 답하면 알림 `inquiry_answer`(actor_id = 답한 관리자, ref_id = 문의 ID)를 넣고, 고쳐 쓰면 안 읽은 같은 알림을 지우고 새로 넣는다. 로그인 없이 보낸 문의는 사이트에서 답을 볼 수 없어 관리자가 메일로 답하고 [처리 완료]로 둔다.
+- 너무 많이 보내지 않게(한국 시간 하루): 회원 10건, 로그인 없이 같은 이메일 3건, 로그인 없이 전체 50건. 세는 데는 아래 인덱스를 쓴다.
+- 삭제: 보낸 회원이 탈퇴하면 그 회원의 문의도 지운다(`CASCADE`, AUTH-06 개인정보 삭제). 답한 관리자가 지워지면 `answered_by`만 비운다(`SET NULL`).
 
 ### 3.4 코인과 경험치는 저장하지 않고 원장에서 계산 (정규화)
 
@@ -542,7 +568,7 @@ COMMIT
 | `item_type` | `character`, `background`, `furniture`, `avatar` (마이그레이션 0006) |
 | `avatar_slot` | `hair`, `top`, `bottom`, `hat`, `shoes` (그리는 순서는 몸 → 헤어 → 하의 → 상의 → 신발 → 모자, `src/lib/art/avatar.ts`). `hair`는 2026-10-13(`0023_hair_slot.sql`): 처음 고른 주민의 머리를 헤어 아이템(짧은 머리·긴 머리, 0코인)으로 떼어 냈다. 자기 머리는 가입할 때 갖고 입은 채로 시작하고(`src/db/starter-hair.ts`), 그 전에 가입한 회원은 `npm run db:seed`가 채운다. 헤어를 벗으면 주민의 기본 머리로 그린다 |
 | `visibility` | `public`, `private` |
-| `notification_kind` | `level_up`, `like`, `comment`, `reply`, `pet_level_up` (마이그레이션 0007), `gift`(관리자 선물, 0020), `mention`(@언급, 0029) |
+| `notification_kind` | `level_up`, `like`, `comment`, `reply`, `pet_level_up` (마이그레이션 0007), `gift`(관리자 선물, 0020), `mention`(@언급, 0029), `inquiry_answer`(문의 답, 0035) |
 | `ledger_reason` | `signup`, `attendance`, `attendance_streak`, `post`, `comment`, `like_received`, `purchase`, `farm_care`, `farm_grown`, `egg_purchase`, `potion_purchase`(0008), `invite`·`invited`(친구 초대, 0009), `admin_grant`(관리자 지급, 0011), `social_link`(0012), `admin_gift`(관리자 선물, 0020) |
 | `animal_status` | `egg`, `growing`, `grown` |
 | `egg_source` | `starter`, `level`, `shop` |
@@ -569,6 +595,8 @@ COMMIT
 | `notifications (user_id, created_at DESC)` | 알림 목록 최신순 |
 | `notifications (user_id, level) WHERE kind = 'level_up'` (UNIQUE) | 같은 레벨업 알림 두 번 방지 |
 | `notifications (user_id, ref_id, level) WHERE kind = 'pet_level_up'` (UNIQUE) | 같은 펫·같은 레벨 알림 두 번 방지 (0008) |
+| `inquiries (status, created_at DESC)` | 관리자 문의함 상태별 목록·기다리는 수, 로그인 없이 보낸 하루 건수 (0035) |
+| `inquiries (user_id, created_at DESC)` | 내 문의 목록, 회원 하루 건수 (0035) |
 | `user_animals (user_id) WHERE carried` (UNIQUE) | 데리고 다니는 펫은 회원당 한 마리 (0008) |
 | `user_animals (user_id, id)` (UNIQUE) | 프로필 전시 카드 복합 외래 키 대상 (0008) |
 | `attachments (user_id, created_at)` | 회원을 지울 때 그 회원의 첨부 찾기, 나중에 양 제한·파일 정리 (POST-07, 마이그레이션 0004) |
