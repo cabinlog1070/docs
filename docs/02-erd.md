@@ -1,7 +1,8 @@
 # BlogCabin ERD (데이터베이스 설계)
 
 - DB: PostgreSQL
-- 버전: 2.3 (2026-10-16, 댓글 하트(SOC-07): `comment_likes`(댓글 ↔ 하트 누른 회원, 기본 키 `(comment_id, user_id)`, 댓글·회원이 지워지면 함께 삭제). 마이그레이션 `0032_comment_likes`)
+- 버전: 2.4 (2026-10-16, 답글에 단 답글(SOC-02): `comments.reply_to_id`(같은 표 `id` 참조, 받는 답글 행이 지워지면 `SET NULL`, 화면이 그 답글 바로 아래에 `↪ 받는 사람`과 함께 놓는다). 마이그레이션 `0033_comment_reply_to`)
+- 2.3 (2026-10-16, 댓글 하트(SOC-07): `comment_likes`(댓글 ↔ 하트 누른 회원, 기본 키 `(comment_id, user_id)`, 댓글·회원이 지워지면 함께 삭제). 마이그레이션 `0032_comment_likes`)
 - 2.2 (2026-10-16, 해시태그를 적은 순서대로 보이기(POST-04): `post_tags.position`(smallint, 기본 0, 글쓴이가 적은 순서). 칸이 생기기 전 글은 모두 0이라 이름순. 마이그레이션 `0031_post_tag_position`)
 - 2.1 (2026-10-15, 미니룸 가구 좌우 뒤집기(SHOP-05): `room_furniture.flipped`(boolean, 기본 false). 마이그레이션 `0030_furniture_flip`)
 - 2.0 (2026-10-15, @블로그주소 언급(SOC-06): 알림 종류 `mention`(actor_id = 쓴 회원, post_id = 글, 댓글에서면 ref_id = 댓글 ID). 테이블·칸 추가 없음. 마이그레이션 `0029_mention_notification`)
@@ -48,6 +49,7 @@ erDiagram
     posts ||--o{ comments : ""
     users ||--o{ comments : "작성"
     comments |o--o{ comments : "답글"
+    comments |o--o{ comments : "답글에 답글"
 
     posts ||--o{ post_likes : ""
     users ||--o{ post_likes : "공감"
@@ -201,6 +203,7 @@ erDiagram
         int post_id FK
         text author_id FK "탈퇴하면 NULL (삭제된 자리만)"
         int parent_id FK "답글이면 원 댓글"
+        int reply_to_id FK "답글에 단 답글이면 받는 답글"
         text content "1~1000자"
         timestamptz created_at
         timestamptz deleted_at "삭제 표시"
