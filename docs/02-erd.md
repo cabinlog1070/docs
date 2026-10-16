@@ -1,7 +1,8 @@
 # BlogCabin ERD (데이터베이스 설계)
 
 - DB: PostgreSQL
-- 버전: 2.2 (2026-10-16, 해시태그를 적은 순서대로 보이기(POST-04): `post_tags.position`(smallint, 기본 0, 글쓴이가 적은 순서). 칸이 생기기 전 글은 모두 0이라 이름순. 마이그레이션 `0031_post_tag_position`)
+- 버전: 2.3 (2026-10-16, 댓글 하트(SOC-07): `comment_likes`(댓글 ↔ 하트 누른 회원, 기본 키 `(comment_id, user_id)`, 댓글·회원이 지워지면 함께 삭제). 마이그레이션 `0032_comment_likes`)
+- 2.2 (2026-10-16, 해시태그를 적은 순서대로 보이기(POST-04): `post_tags.position`(smallint, 기본 0, 글쓴이가 적은 순서). 칸이 생기기 전 글은 모두 0이라 이름순. 마이그레이션 `0031_post_tag_position`)
 - 2.1 (2026-10-15, 미니룸 가구 좌우 뒤집기(SHOP-05): `room_furniture.flipped`(boolean, 기본 false). 마이그레이션 `0030_furniture_flip`)
 - 2.0 (2026-10-15, @블로그주소 언급(SOC-06): 알림 종류 `mention`(actor_id = 쓴 회원, post_id = 글, 댓글에서면 ref_id = 댓글 ID). 테이블·칸 추가 없음. 마이그레이션 `0029_mention_notification`)
 - 1.9 (2026-10-13, 관리자 선물에 펫 알: `gift_pets`(선물 하나에 담긴 펫 종류), 나올 펫이 정해진 알 `user_animals.egg_species_id`(NULL이면 부화할 때 무작위), 알 받은 곳 `gift`. 예전 상점 캐릭터 9종(`char_human`·`char_cat`·`char_dog`·`char_rabbit`·`char_fox`·`char_panda`·`char_robot`·`char_dragon`·`char_unicorn`)을 `items`에서 지우고, 가졌던 주민에게는 캐릭터마다 그 동물 알(판다→곰, 로봇→공룡, 모험가→강아지)을 보낸 사람 없는 선물로 준다. 쓰던 주민은 기본 주민(긴 머리 헤어를 입었으면 `char_girl`, 아니면 `char_boy`)과 그 기본 헤어로 바꾼다. 마이그레이션 `0027_gift_pets`·`0028_remove_old_characters`. 3.3-7)
@@ -50,6 +51,9 @@ erDiagram
 
     posts ||--o{ post_likes : ""
     users ||--o{ post_likes : "공감"
+
+    comments ||--o{ comment_likes : ""
+    users ||--o{ comment_likes : "하트"
 
     users ||--o{ follows : "이웃 추가함"
     users ||--o{ follows : "이웃 추가됨"
@@ -207,6 +211,11 @@ erDiagram
         text user_id PK, FK
         timestamptz created_at
     }
+    comment_likes {
+        int comment_id PK, FK
+        text user_id PK, FK
+        timestamptz created_at
+    }
     follows {
         text follower_id PK, FK
         text followee_id PK, FK
@@ -333,7 +342,7 @@ erDiagram
 |---|---|---|
 | 인증 | `users`, `accounts`, `sessions`, `verifications` | AUTH |
 | 회원·블로그 | `profiles`, `blogs`, `categories` | AUTH-02, BLOG |
-| 글·교류 | `posts`, `tags`, `post_tags`, `comments`, `post_likes`, `follows` | POST, SOC |
+| 글·교류 | `posts`, `tags`, `post_tags`, `comments`, `post_likes`, `comment_likes`, `follows` | POST, SOC |
 | 아이템 | `items`, `user_items`, `avatar_equips`, `room_furniture` | GAME-01, SHOP |
 | 보상 | `attendances`, `point_ledger` | GAME-02~05 |
 | 첨부 | `attachments` | POST-07, POST-09 |
@@ -503,6 +512,7 @@ COMMIT
 |---|---|---|
 | `post_tags` | 글 ↔ 태그 | `(post_id, tag_id)` → `position`(2026-10-16, `0031_post_tag_position`)에 글쓴이가 적은 순서를 두고 그 순서로 보여 준다. 고쳐 저장하면 순서를 다시 적는다 |
 | `post_likes` | 글 ↔ 공감한 회원 | `(post_id, user_id)` → 한 글에 한 번만 공감 (SOC-03) |
+| `comment_likes` | 댓글 ↔ 하트 누른 회원 | `(comment_id, user_id)` → 한 댓글에 한 번만 하트 (SOC-07) |
 | `user_items` | 회원 ↔ 아이템 | `(user_id, item_id)` → 같은 아이템 중복 보유 불가 |
 | `follows` | 회원 ↔ 회원 (자기 참조) | `(follower_id, followee_id)` |
 
@@ -512,9 +522,9 @@ COMMIT
 
 | 지워지는 것 | 함께 처리 |
 |---|---|
-| 회원 (탈퇴, AUTH-06) | 프로필, 블로그, 글, 공감, 원장, 이웃, 첨부 정보, 받은 알림과 그 회원이 행동한 알림, 알·펫·돌보기 기록·농장 가방 모두 삭제 (`CASCADE`). 저장소의 첨부 파일도 탈퇴 처리가 지운다. 남의 글에 단 댓글은 `deleteMember`가 먼저 정리한다(3.3-5): 남의 답글이 남은 원댓글만 작성자 없는 삭제된 자리로 남고(`author_id` `SET NULL`), 나머지는 지운다. 나를 초대한 사람으로 적힌 `profiles.invited_by`는 `SET NULL`. 방문·조회 기록은 키만 바꿔 남긴다 |
+| 회원 (탈퇴, AUTH-06) | 프로필, 블로그, 글, 공감, 댓글 하트, 원장, 이웃, 첨부 정보, 받은 알림과 그 회원이 행동한 알림, 알·펫·돌보기 기록·농장 가방 모두 삭제 (`CASCADE`). 저장소의 첨부 파일도 탈퇴 처리가 지운다. 남의 글에 단 댓글은 `deleteMember`가 먼저 정리한다(3.3-5): 남의 답글이 남은 원댓글만 작성자 없는 삭제된 자리로 남고(`author_id` `SET NULL`), 나머지는 지운다. 나를 초대한 사람으로 적힌 `profiles.invited_by`는 `SET NULL`. 방문·조회 기록은 키만 바꿔 남긴다 |
 | 블로그 | 카테고리, 글 삭제 |
-| 글 | 태그 연결, 댓글, 공감, 그 글의 알림 삭제 |
+| 글 | 태그 연결, 댓글(과 그 하트), 공감, 그 글의 알림 삭제 |
 | 카테고리 | 글은 남기고 `category_id`만 비움 (`SET NULL`) |
 | 댓글 | 답글이 있을 수 있으니 행을 지우지 않고 `deleted_at`만 기록. 화면에는 살아 있는 답글이 있는 원댓글만 작성자·시각 없이 `삭제된 댓글이에요`로 보이고 나머지는 보이지 않는다 (spec 004 FR-008, `getComments`) |
 | 블로그 / 글 | `blog_visits` / `post_views` 기록도 함께 삭제 (`CASCADE`) |
@@ -549,6 +559,7 @@ COMMIT
 | `point_ledger (user_id, reason, created_at)` | 잔액 계산, 하루 상한 확인 |
 | `point_ledger (user_id, created_at DESC)` | 경험치·코인 내역 화면 최신순 (GAME-07, 마이그레이션 0003) |
 | `follows (followee_id)` | 나를 이웃 추가한 사람 |
+| `comment_likes (user_id)` | 회원을 지울 때 그 회원의 하트 찾기 (`CASCADE`, 0032) |
 | `notifications (user_id, read_at, created_at DESC)` | 헤더 쪽지의 안 읽은 개수, 안 본 레벨업 팝업 (GAME-08, 마이그레이션 0007) |
 | `notifications (user_id, created_at DESC)` | 알림 목록 최신순 |
 | `notifications (user_id, level) WHERE kind = 'level_up'` (UNIQUE) | 같은 레벨업 알림 두 번 방지 |
