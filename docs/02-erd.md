@@ -1,7 +1,8 @@
 # BlogCabin ERD (데이터베이스 설계)
 
 - DB: PostgreSQL
-- 버전: 2.5 (2026-10-16, 문의함(AUTH-11): `inquiries`(문의 하나, 회원이 보내면 `user_id`, 로그인 없이 보내면 `user_id` 없이 `contact_email`·`guest_username`), 알림 종류 `inquiry_answer`(ref_id = 문의 ID). 마이그레이션 `0034_inquiries`. 3.3-8)
+- 버전: 2.6 (2026-10-16, 문의함(AUTH-11): `inquiries`(문의 하나, 회원이 보내면 `user_id`, 로그인 없이 보내면 `user_id` 없이 `contact_email`·`guest_username`), 알림 종류 `inquiry_answer`(ref_id = 문의 ID). 마이그레이션 `0035_inquiries`. 3.3-8)
+- 2.5 (2026-10-16, 상의 넣어 입기/빼 입기: `profiles.top_out`(boolean, 기본 false = 넣어 입기, true면 모습 키의 상의 키 뒤에 `@out`). 마이그레이션 `0034_top_out`)
 - 2.4 (2026-10-16, 답글에 단 답글(SOC-02): `comments.reply_to_id`(같은 표 `id` 참조, 받는 답글 행이 지워지면 `SET NULL`, 화면이 그 답글 바로 아래에 `↪ 받는 사람`과 함께 놓는다). 마이그레이션 `0033_comment_reply_to`)
 - 2.3 (2026-10-16, 댓글 하트(SOC-07): `comment_likes`(댓글 ↔ 하트 누른 회원, 기본 키 `(comment_id, user_id)`, 댓글·회원이 지워지면 함께 삭제). 마이그레이션 `0032_comment_likes`)
 - 2.2 (2026-10-16, 해시태그를 적은 순서대로 보이기(POST-04): `post_tags.position`(smallint, 기본 0, 글쓴이가 적은 순서). 칸이 생기기 전 글은 모두 0이라 이름순. 마이그레이션 `0031_post_tag_position`)
@@ -126,6 +127,7 @@ erDiagram
         timestamptz invite_rewarded_at "초대 보상을 준 시각 (한 번만)"
         text status_message "상태 메시지 1~30자 (광장 말풍선, TOWN-12)"
         text hair_color "머리 색 (무료, NULL = 헤어 그대로의 색)"
+        boolean top_out "상의 빼 입기 (기본 false = 넣어 입기)"
         timestamptz created_at
     }
     blogs {
@@ -477,7 +479,7 @@ FOREIGN KEY (item_id, slot) REFERENCES items (id, slot)                         
 - 펫 알 (2026-10-13, 마이그레이션 0027): 고른 펫 종류마다 `gift_pets (gift_id, species_id) PK`에 남기고, 받은 주민에게 `user_animals` 알(`source = 'gift'`, `egg_species_id` = 그 종류)을 넣는다. 부화하면 `egg_species_id`의 펫이 나오고(비중 무작위를 건너뜀), 나머지(이름·성별)는 보통 알과 같다. 펫은 이미 키우고 있어도 보내고, 둥지가 꽉 차 있어도 넣는다. `egg_species_id`는 부화한 뒤에도 남겨 둔다(어떤 알이었는지 기록).
 - 예전 캐릭터 정리 (마이그레이션 0028): 가졌던 캐릭터마다 그 동물 알을, 주민마다 보낸 사람 없는 선물 하나(함께 보낸 말 + `gift_pets`)와 `gift` 알림으로 준다.
 
-### 3.3-8 문의함 (AUTH-11, 2026-10-16, 마이그레이션 0034)
+### 3.3-8 문의함 (AUTH-11, 2026-10-16, 마이그레이션 0035)
 
 - 문의하기 화면에서 남긴 문의 하나 = `inquiries` 한 행. 관리자는 관리자 화면 [문의함]에서 상태별로 본다. 관리자 메일 주소는 화면에 두지 않는다(제품 담당 결정).
 - 보낸 사람: 로그인한 회원이면 `user_id`, 로그인하지 못하는 사람(비밀번호를 잊은 사람)이면 `user_id` 없이 답받을 `contact_email`(필수, 소문자로 저장)과 아는 아이디 `guest_username`(선택). CHECK `inquiries_sender_check`: `user_id IS NOT NULL OR contact_email IS NOT NULL`. 아이디는 본인 확인 전이라 `users`를 가리키지 않고 적은 글자 그대로 두고, 관리자 화면이 읽을 때 같은 아이디의 회원을 찾아 잇는다.
@@ -566,7 +568,7 @@ COMMIT
 | `item_type` | `character`, `background`, `furniture`, `avatar` (마이그레이션 0006) |
 | `avatar_slot` | `hair`, `top`, `bottom`, `hat`, `shoes` (그리는 순서는 몸 → 헤어 → 하의 → 상의 → 신발 → 모자, `src/lib/art/avatar.ts`). `hair`는 2026-10-13(`0023_hair_slot.sql`): 처음 고른 주민의 머리를 헤어 아이템(짧은 머리·긴 머리, 0코인)으로 떼어 냈다. 자기 머리는 가입할 때 갖고 입은 채로 시작하고(`src/db/starter-hair.ts`), 그 전에 가입한 회원은 `npm run db:seed`가 채운다. 헤어를 벗으면 주민의 기본 머리로 그린다 |
 | `visibility` | `public`, `private` |
-| `notification_kind` | `level_up`, `like`, `comment`, `reply`, `pet_level_up` (마이그레이션 0007), `gift`(관리자 선물, 0020), `mention`(@언급, 0029), `inquiry_answer`(문의 답, 0034) |
+| `notification_kind` | `level_up`, `like`, `comment`, `reply`, `pet_level_up` (마이그레이션 0007), `gift`(관리자 선물, 0020), `mention`(@언급, 0029), `inquiry_answer`(문의 답, 0035) |
 | `ledger_reason` | `signup`, `attendance`, `attendance_streak`, `post`, `comment`, `like_received`, `purchase`, `farm_care`, `farm_grown`, `egg_purchase`, `potion_purchase`(0008), `invite`·`invited`(친구 초대, 0009), `admin_grant`(관리자 지급, 0011), `social_link`(0012), `admin_gift`(관리자 선물, 0020) |
 | `animal_status` | `egg`, `growing`, `grown` |
 | `egg_source` | `starter`, `level`, `shop` |
@@ -593,8 +595,8 @@ COMMIT
 | `notifications (user_id, created_at DESC)` | 알림 목록 최신순 |
 | `notifications (user_id, level) WHERE kind = 'level_up'` (UNIQUE) | 같은 레벨업 알림 두 번 방지 |
 | `notifications (user_id, ref_id, level) WHERE kind = 'pet_level_up'` (UNIQUE) | 같은 펫·같은 레벨 알림 두 번 방지 (0008) |
-| `inquiries (status, created_at DESC)` | 관리자 문의함 상태별 목록·기다리는 수, 로그인 없이 보낸 하루 건수 (0034) |
-| `inquiries (user_id, created_at DESC)` | 내 문의 목록, 회원 하루 건수 (0034) |
+| `inquiries (status, created_at DESC)` | 관리자 문의함 상태별 목록·기다리는 수, 로그인 없이 보낸 하루 건수 (0035) |
+| `inquiries (user_id, created_at DESC)` | 내 문의 목록, 회원 하루 건수 (0035) |
 | `user_animals (user_id) WHERE carried` (UNIQUE) | 데리고 다니는 펫은 회원당 한 마리 (0008) |
 | `user_animals (user_id, id)` (UNIQUE) | 프로필 전시 카드 복합 외래 키 대상 (0008) |
 | `attachments (user_id, created_at)` | 회원을 지울 때 그 회원의 첨부 찾기, 나중에 양 제한·파일 정리 (POST-07, 마이그레이션 0004) |
