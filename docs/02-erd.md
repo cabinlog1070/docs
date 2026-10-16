@@ -1,7 +1,8 @@
 # BlogCabin ERD (데이터베이스 설계)
 
 - DB: PostgreSQL
-- 버전: 2.1 (2026-10-15, 미니룸 가구 좌우 뒤집기(SHOP-05): `room_furniture.flipped`(boolean, 기본 false). 마이그레이션 `0030_furniture_flip`)
+- 버전: 2.2 (2026-10-16, 해시태그를 적은 순서대로 보이기(POST-04): `post_tags.position`(smallint, 기본 0, 글쓴이가 적은 순서). 칸이 생기기 전 글은 모두 0이라 이름순. 마이그레이션 `0031_post_tag_position`)
+- 2.1 (2026-10-15, 미니룸 가구 좌우 뒤집기(SHOP-05): `room_furniture.flipped`(boolean, 기본 false). 마이그레이션 `0030_furniture_flip`)
 - 2.0 (2026-10-15, @블로그주소 언급(SOC-06): 알림 종류 `mention`(actor_id = 쓴 회원, post_id = 글, 댓글에서면 ref_id = 댓글 ID). 테이블·칸 추가 없음. 마이그레이션 `0029_mention_notification`)
 - 1.9 (2026-10-13, 관리자 선물에 펫 알: `gift_pets`(선물 하나에 담긴 펫 종류), 나올 펫이 정해진 알 `user_animals.egg_species_id`(NULL이면 부화할 때 무작위), 알 받은 곳 `gift`. 예전 상점 캐릭터 9종(`char_human`·`char_cat`·`char_dog`·`char_rabbit`·`char_fox`·`char_panda`·`char_robot`·`char_dragon`·`char_unicorn`)을 `items`에서 지우고, 가졌던 주민에게는 캐릭터마다 그 동물 알(판다→곰, 로봇→공룡, 모험가→강아지)을 보낸 사람 없는 선물로 준다. 쓰던 주민은 기본 주민(긴 머리 헤어를 입었으면 `char_girl`, 아니면 `char_boy`)과 그 기본 헤어로 바꾼다. 마이그레이션 `0027_gift_pets`·`0028_remove_old_characters`. 3.3-7)
 - 1.7 (2026-10-13, 관리자 선물: `gifts`·`gift_items`, 원장 사유 `admin_gift`(ref_id = 선물 ID), 알림 종류 `gift`(ref_id = 선물 ID). 마이그레이션 `0026_admin_gift`. 3.3-7)
@@ -189,6 +190,7 @@ erDiagram
     post_tags {
         int post_id PK, FK
         int tag_id PK, FK
+        smallint position "적은 순서 (0부터)"
     }
     comments {
         int id PK
@@ -499,7 +501,7 @@ COMMIT
 
 | 연결 테이블 | 잇는 것 | 기본 키 |
 |---|---|---|
-| `post_tags` | 글 ↔ 태그 | `(post_id, tag_id)` |
+| `post_tags` | 글 ↔ 태그 | `(post_id, tag_id)` → `position`(2026-10-16, `0031_post_tag_position`)에 글쓴이가 적은 순서를 두고 그 순서로 보여 준다. 고쳐 저장하면 순서를 다시 적는다 |
 | `post_likes` | 글 ↔ 공감한 회원 | `(post_id, user_id)` → 한 글에 한 번만 공감 (SOC-03) |
 | `user_items` | 회원 ↔ 아이템 | `(user_id, item_id)` → 같은 아이템 중복 보유 불가 |
 | `follows` | 회원 ↔ 회원 (자기 참조) | `(follower_id, followee_id)` |
