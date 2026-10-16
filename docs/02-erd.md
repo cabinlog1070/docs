@@ -1,7 +1,8 @@
 # BlogCabin ERD (데이터베이스 설계)
 
 - DB: PostgreSQL
-- 버전: 2.4 (2026-10-16, 답글에 단 답글(SOC-02): `comments.reply_to_id`(같은 표 `id` 참조, 받는 답글 행이 지워지면 `SET NULL`, 화면이 그 답글 바로 아래에 `↪ 받는 사람`과 함께 놓는다). 마이그레이션 `0033_comment_reply_to`)
+- 버전: 2.5 (2026-10-16, 상의 넣어 입기/빼 입기: `profiles.top_out`(boolean, 기본 false = 넣어 입기, true면 모습 키의 상의 키 뒤에 `@out`). 마이그레이션 `0034_top_out`)
+- 2.4 (2026-10-16, 답글에 단 답글(SOC-02): `comments.reply_to_id`(같은 표 `id` 참조, 받는 답글 행이 지워지면 `SET NULL`, 화면이 그 답글 바로 아래에 `↪ 받는 사람`과 함께 놓는다). 마이그레이션 `0033_comment_reply_to`)
 - 2.3 (2026-10-16, 댓글 하트(SOC-07): `comment_likes`(댓글 ↔ 하트 누른 회원, 기본 키 `(comment_id, user_id)`, 댓글·회원이 지워지면 함께 삭제). 마이그레이션 `0032_comment_likes`)
 - 2.2 (2026-10-16, 해시태그를 적은 순서대로 보이기(POST-04): `post_tags.position`(smallint, 기본 0, 글쓴이가 적은 순서). 칸이 생기기 전 글은 모두 0이라 이름순. 마이그레이션 `0031_post_tag_position`)
 - 2.1 (2026-10-15, 미니룸 가구 좌우 뒤집기(SHOP-05): `room_furniture.flipped`(boolean, 기본 false). 마이그레이션 `0030_furniture_flip`)
@@ -123,6 +124,7 @@ erDiagram
         timestamptz invite_rewarded_at "초대 보상을 준 시각 (한 번만)"
         text status_message "상태 메시지 1~30자 (광장 말풍선, TOWN-12)"
         text hair_color "머리 색 (무료, NULL = 헤어 그대로의 색)"
+        boolean top_out "상의 빼 입기 (기본 false = 넣어 입기)"
         timestamptz created_at
     }
     blogs {
